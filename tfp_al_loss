@@ -1,0 +1,398 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jul  9 10:40:19 2020
+
+@author: aklimasewski
+"""
+
+
+
+#%%
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow import keras
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, Input, Dropout
+from tensorflow.keras.regularizers import l2
+
+
+from tensorflow.keras import backend as K
+import tensorflow as tf
+
+
+#aleatoric uncertainty using aleatoric loss function
+
+n = 100
+x_func = np.linspace(-4,4,100)
+y_func = x_func
+
+x_train = np.random.uniform(-3, -2, n)
+y_train = x_train + np.random.randn(*x_train.shape)*0.5
+
+x_train = np.concatenate([x_train, np.random.uniform(2, 3, n)])
+y_train = np.concatenate([y_train, x_train[n:] + np.random.randn(*x_train[n:].shape)*0.1])
+x_test = np.linspace(-5,5,100)
+
+fig, ax = plt.subplots(1,1,figsize=(10,5))
+ax.scatter(x_train, y_train, label='training data', s = 3)
+ax.plot(x_func, y_func, ls='--', label='real function', color='green')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+ax.legend()
+ax.set_title('Data with uncertainty')
+plt.show()
+
+# aleatoric- predicted with loss function (output 2D)
+# aleatoric loss function
+def aleatoric_loss(y_true, y_pred):
+    N = y_true.shape[0]
+    se = K.pow((y_true[:,0]-y_pred[:,0]),2)
+    inv_std = K.exp(-y_pred[:,1])
+    mse = K.mean(inv_std*se)
+    reg = K.mean(y_pred[:,1])
+    return 0.5*(mse + reg)
+
+
+def architecture(layers_shape, input_dim, output_dim, dropout_proba, reg, act='relu', verbose=False):
+    inputs = Input(shape=(input_dim,))
+    hidden = Dense(layers_shape[0], activation=act,
+                   kernel_regularizer=l2(reg))(inputs)
+    for i in range(len(layers_shape)-1):
+        if dropout_proba > 0:
+          hidden = Dropout(dropout_proba)(hidden, training=True)
+        hidden = Dense(layers_shape[i+1], activation=act, kernel_regularizer=l2(reg))(hidden)
+    if dropout_proba > 0:
+      hidden = Dropout(dropout_proba)(hidden, training=True)
+    outputs = Dense(output_dim, kernel_regularizer=l2(reg))(hidden) 
+    model = Model(inputs, outputs)
+    if verbose:
+      model.summary()
+    return model
+  
+model_aleatoric = architecture(layers_shape=[5], 
+                                            input_dim= 1, output_dim=2, 
+                                            dropout_proba=0, reg=0, 
+                                            act='relu', verbose=1)
+model_aleatoric.compile(optimizer='rmsprop', 
+                                     loss=aleatoric_loss, metrics=['mae'])
+model_aleatoric.fit(x_train, y_train, 
+                                 batch_size=20, epochs=500, shuffle=True, verbose=1)
+
+
+# plot aleatoric uncertainty
+fig, ax = plt.subplots(1,1,figsize=(10,5))
+x_test=np.linspace(-5,5,100)
+y_test=np.linspace(-5,5,100)
+p =  model_aleatoric.predict(x_test)
+predict_mean, predict_al = p[:,0],p[:,1]
+
+aleatoric_std = np.exp(0.5*predict_al)
+ax.scatter(x_train, y_train, s=3, label='train data')
+ax.plot(x_test, y_test, ls='--', label='test data', color='green')
+ax.errorbar(x_test, predict_mean, yerr=aleatoric_std, fmt='.', label='aleatory uncertainty', color='orange')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+ax.legend()
+
+#%%
+# GaussianProcessRegressionModel  for epistemic uncertainty with trainable kernal params
+#
+
+import numpy as np
+import tensorflow.compat.v2 as tf
+import tensorflow_probability as tfp
+tfb = tfp.bijectors
+tfd = tfp.distributions
+tfk = tfp.math.psd_kernels
+tf.enable_v2_behavior()
+
+
+# Configure plot defaults
+plt.rcParams['axes.facecolor'] = 'white'
+plt.rcParams['grid.color'] = '#666666'
+
+
+
+# Generate training data with a known noise level (we'll later try to recover
+# this value from the data).
+NUM_TRAINING_POINTS = 200
+observation_index_points_, observations_ = (x_train.reshape((200, 1)),y_train)
+
+
+
+def build_gp(amplitude, length_scale, observation_noise_variance):
+  """Defines the conditional dist. of GP outputs, given kernel parameters."""
+
+  # Create the covariance kernel, which will be shared between the prior (which we
+  # use for maximum likelihood training) and the posterior (which we use for
+  # posterior predictive sampling)
+  # kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
+  
+  kernel = tfp.math.psd_kernels.MaternOneHalf(amplitude, length_scale)
+
+  # Create the GP prior distribution, which we will use to train the model
+  # parameters.
+  return tfd.GaussianProcess(
+      kernel=kernel,
+      index_points=observation_index_points_,
+      observation_noise_variance=observation_noise_variance)
+
+gp_joint_model = tfd.JointDistributionNamed({
+    'amplitude': tfd.LogNormal(loc=0., scale=np.float64(1.)),
+    'length_scale': tfd.LogNormal(loc=0., scale=np.float64(1.)),
+    'observation_noise_variance': tfd.LogNormal(loc=0., scale=np.float64(1.)),
+    'observations': build_gp,
+})
+
+
+x = gp_joint_model.sample()
+lp = gp_joint_model.log_prob(x)
+
+print("sampled {}".format(x))
+print("log_prob of sample: {}".format(lp))
+
+
+# Create the trainable model parameters, which we'll subsequently optimize.
+# Note that we constrain them to be strictly positive.
+
+constrain_positive = tfb.Shift(np.finfo(np.float64).tiny)(tfb.Exp())
+
+amplitude_var = tfp.util.TransformedVariable(
+    initial_value=1.,
+    bijector=constrain_positive,
+    name='amplitude',
+    dtype=np.float64)
+
+length_scale_var = tfp.util.TransformedVariable(
+    initial_value=1.,
+    bijector=constrain_positive,
+    name='length_scale',
+    dtype=np.float64)
+
+observation_noise_variance_var = tfp.util.TransformedVariable(
+    initial_value=1.,
+    bijector=constrain_positive,
+    name='observation_noise_variance_var',
+    dtype=np.float64)
+
+trainable_variables = [v.trainable_variables[0] for v in 
+                       [amplitude_var,
+                       length_scale_var,
+                       observation_noise_variance_var]]
+
+
+@tf.function(autograph=False, experimental_compile=False)
+def target_log_prob(amplitude, length_scale, observation_noise_variance):
+  return gp_joint_model.log_prob({
+      'amplitude': amplitude,
+      'length_scale': length_scale,
+      'observation_noise_variance': observation_noise_variance,
+      'observations': observations_
+  })
+
+
+# Now we optimize the model parameters.
+num_iters = 1000
+optimizer = tf.optimizers.Adam(learning_rate=.01)
+
+# Store the likelihood values during training, so we can plot the progress
+lls_ = np.zeros(num_iters, np.float64)
+for i in range(num_iters):
+  with tf.GradientTape() as tape:
+    loss = -target_log_prob(amplitude_var, length_scale_var,
+                            observation_noise_variance_var)
+  grads = tape.gradient(loss, trainable_variables)
+  optimizer.apply_gradients(zip(grads, trainable_variables))
+  lls_[i] = loss
+
+print('Trained parameters:')
+print('amplitude: {}'.format(amplitude_var._value().numpy()))
+print('length_scale: {}'.format(length_scale_var._value().numpy()))
+print('observation_noise_variance: {}'.format(observation_noise_variance_var._value().numpy()))
+
+
+# Having trained the model, we'd like to sample from the posterior conditioned
+# on observations. We'd like the samples to be at points other than the training
+# inputs.
+predictive_index_points_ = x_test
+# Reshape to [200, 1] -- 1 is the dimensionality of the feature space.
+predictive_index_points_ = predictive_index_points_[..., np.newaxis]
+
+optimized_kernel = tfk.MaternOneHalf(amplitude_var, length_scale_var)
+gprm = tfd.GaussianProcessRegressionModel(
+    kernel=optimized_kernel,
+    index_points=predictive_index_points_,
+    observation_index_points=observation_index_points_,
+    observations=observations_,
+    observation_noise_variance=observation_noise_variance_var,
+    predictive_noise_variance=0.)
+
+# Create op to draw  50 independent samples, each of which is a *joint* draw
+# from the posterior at the predictive_index_points_. Since we have 200 input
+# locations as defined above, this posterior distribution over corresponding
+# function values is a 200-dimensional multivariate Gaussian distribution!
+num_samples = 50
+samples = gprm.sample(num_samples)
+
+
+
+predict_mean = []
+predict_al = []
+predict_epistemic = []
+for i in range(num_samples):
+    p = samples[i]
+    mean =  np.asarray(p)
+    predict_mean.append(mean)
+
+mean_x_test = np.mean(predict_mean, axis = 0).flatten()
+predict_epistemic = np.std(predict_mean, axis = 0).flatten()
+
+
+
+# plot epistemic uncertainty
+fig, ax = plt.subplots(1,1,figsize=(10,5))
+ax.scatter(x_train, y_train, s=3, label='train data')
+ax.plot(x_test, y_test, ls='--', label='test data', color='green')
+ax.errorbar(x_test, mean_x_test, yerr=predict_epistemic, fmt='.', label='epistemic uncertainty', color='pink')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+ax.legend()
+
+
+
+
+
+#%%
+#epistemic uncertianty from model distribution
+# neg log likelihood loss function
+
+#sequential model with optimized kernel parameters
+
+tf.keras.backend.set_floatx('float64')
+
+# optimized_kernel = tfk.MaternOneHalf(amplitude_var, length_scale_var)
+
+
+
+# class RBFKernelFn(tf.keras.layers.Layer):
+#   def __init__(self, **kwargs):
+#     super(RBFKernelFn, self).__init__(**kwargs)
+#     dtype = kwargs.get('dtype', None)
+
+#     self._amplitude = self.add_variable(
+#             initializer=tf.constant_initializer(0),
+#             dtype=dtype,
+#             name='amplitude')
+    
+#     self._length_scale = self.add_variable(
+#             initializer=tf.constant_initializer(0),
+#             dtype=dtype,
+#             name='length_scale')
+
+#   def call(self, x):
+#     # Never called -- this is just a layer so it can hold variables
+#     # in a way Keras understands.
+#     return x
+
+#   @property
+#   def kernel(self):
+#      return tfk.MaternOneHalf(
+#        amplitude=amplitude_var,
+#        length_scale=length_scale_var)
+
+class RBFKernelFn(tf.keras.layers.Layer):
+  def __init__(self, **kwargs):
+    super(RBFKernelFn, self).__init__(**kwargs)
+    dtype = kwargs.get('dtype', None)
+
+    self._amplitude = self.add_variable(
+            initializer=tf.constant_initializer(0),
+            dtype=dtype,
+            name='amplitude')
+    
+    self._length_scale = self.add_variable(
+            initializer=tf.constant_initializer(0),
+            dtype=dtype,
+            name='length_scale')
+
+  def call(self, x):
+    # Never called -- this is just a layer so it can hold variables
+    # in a way Keras understands.
+    return x
+
+  @property
+  def kernel(self):
+     return tfp.math.psd_kernels.MaternOneHalf(
+       amplitude=tf.nn.softplus(1.0 * self._amplitude),
+       length_scale=tf.nn.softplus(1. * self._length_scale)
+     )
+
+num_inducing_points = 40
+
+x_range = [min(x_train),max(y_train)]
+
+# Build model.
+num_inducing_points = 40
+model = tf.keras.Sequential([
+    tf.keras.layers.InputLayer(input_shape=[1]),
+    tf.keras.layers.Dense(1, kernel_initializer='ones', use_bias=False),
+    tfp.layers.VariationalGaussianProcess(
+        num_inducing_points=num_inducing_points,
+        kernel_provider=RBFKernelFn(),
+        event_shape=[1],
+        inducing_index_points_initializer=tf.constant_initializer(
+            np.linspace(*x_range, num=num_inducing_points,
+                        dtype=x.dtype)[..., np.newaxis]),
+        unconstrained_observation_noise_variance_initializer=(
+            tf.constant_initializer(np.array(0.54).astype(x.dtype))),
+    ),
+])
+
+
+print(model.summary())
+
+# # #loss
+batch_size = 32
+loss = lambda y, rv_y: rv_y.variational_loss(
+    y, kl_weight=np.array(batch_size, x_train.dtype) / x_train.shape[0])
+
+
+model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.01), loss=loss,metrics=['mae','mse'])
+
+model.fit(x_train, y_train, batch_size=batch_size, epochs=200, verbose=True)
+
+
+# model_aleatoric.compile(optimizer=tf.optimizers.Adam(learning_rate=0.01), loss=aleatoric_loss,metrics=['mae','mse'])
+
+# model_aleatoric.fit(x_train, y_train, batch_size=batch_size, epochs=100, verbose=True)
+
+
+
+predict_mean = []
+predict_al = []
+predict_epistemic = []
+for i in range(100):
+    p = np.array(model.predict(x_test)) 
+    mean = p[:,0]
+    predict_mean.append(mean)
+
+mean_x_test = np.mean(predict_mean, axis = 0)
+predict_epistemic = np.std(predict_mean, axis = 0)
+
+# plot aleatoric uncertainty
+fig, ax = plt.subplots(1,1,figsize=(10,5))
+
+ax.scatter(x_train, y_train, s=3, label='train data')
+ax.plot(x_test, y_test, ls='--', label='test data', color='green')
+
+ax.errorbar(x_test, mean_x_test, yerr=predict_epistemic, fmt='.', label='epistemic uncertainty', color='pink')
+
+ax.set_xlabel('x')
+
+ax.set_ylabel('y')
+ax.legend()
+
+
+
+

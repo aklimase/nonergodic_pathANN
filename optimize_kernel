@@ -1,0 +1,834 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Jul 13 10:11:08 2020
+
+@author: aklimasewski
+"""
+
+
+from pprint import pprint
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+import pandas as pd
+from tensorflow import random
+random.set_seed(1)
+from sklearn.preprocessing import PowerTransformer
+from keras import layers
+from keras import optimizers
+# import gc
+import seaborn as sns; 
+sns.set(style="ticks", color_codes=True)
+from keras.models import Sequential
+
+import tensorflow.compat.v2 as tf
+tf.enable_v2_behavior()
+
+import tensorflow_probability as tfp
+
+
+class OptMaternOneHalfFn(tf.keras.layers.Layer):
+  def __init__(self, **kwargs):
+    super(OptMaternOneHalfFn, self).__init__(**kwargs)
+    dtype = kwargs.get('dtype', None)
+
+    self._amplitude = self.add_variable(
+            initializer=tf.constant_initializer(0),
+            dtype=dtype,
+            name='amplitude')
+    
+    self._length_scale = self.add_variable(
+            initializer=tf.constant_initializer(0),
+            dtype=dtype,
+            name='length_scale')
+
+  def call(self, x):
+    # Never called -- this is just a layer so it can hold variables
+    # in a way Keras understands.
+    return x
+
+  @property
+  def kernel(self):
+    return tfp.math.psd_kernels.MaternOneHalf(
+      amplitude=tf.nn.softplus(0.1 * self._amplitude),
+      length_scale=tf.nn.softplus(5. * self._length_scale)
+    )
+
+
+
+class OptLineFn(tf.keras.layers.Layer):
+  def __init__(self, **kwargs):
+    super(OptMaternOneHalfFn, self).__init__(**kwargs)
+    dtype = kwargs.get('dtype', None)
+
+    self._amplitude = self.add_variable(
+            initializer=tf.constant_initializer(0),
+            dtype=dtype,
+            name='amplitude')
+    
+    self._length_scale = self.add_variable(
+            initializer=tf.constant_initializer(0),
+            dtype=dtype,
+            name='length_scale')
+
+  def call(self, x):
+    # Never called -- this is just a layer so it can hold variables
+    # in a way Keras understands.
+    return x
+
+  @property
+  def kernel(self):
+    return tfp.math.psd_kernels.Linear(
+    )
+
+eq_indices = [0, 2, 4]
+periodic_indices = [1, 3]
+eq_kernel = tfp.math.psd_kernels.FeatureTransformed(
+    tfp.math.psd_kernels.MaternOneHalf(amplitude=tf.constant([2.0, 3.0, 4.0]),
+      length_scale=tf.constant([2.0, 3.0, 4.0])),
+    # transformation_fn=lambda x: tf.gather(x, eq_indices, axis=-1))
+    transformation_fn=lambda x, _: tf.gather(x, eq_indices, axis=-1))
+periodic_kernel = tfp.math.psd_kernels.FeatureTransformed(
+    tfp.math.psd_kernels.Linear(),
+    # transformation_fn=lambda x: tf.gather(x, periodic_indices, axis=-1))
+    transformation_fn=lambda x, _: tf.gather(x, periodic_indices, axis=-1))
+kernel = eq_kernel + periodic_kernel
+
+
+
+#%%
+#workthrough tensorflow demo and dimensions
+ 
+
+# Suppose `SomeKernel` acts on vectors (rank-1 tensors), ie number of
+# feature dimensions is 1.
+scalar_kernel = tfp.math.psd_kernels.MaternOneHalf(amplitude=1, length_scale=1)
+scalar_kernel.batch_shape
+# ==> []
+
+# `x` and `y` are batches of five 3-D vectors:
+x = np.ones([5, 3], np.float32)
+y = np.ones([5, 3], np.float32)
+scalar_kernel.apply(x, y).shape #number of samples
+# ==> [5]
+
+scalar_kernel.matrix(x, y).shape
+# ==> [5, 5]
+
+#batched kernel
+batch_kernel = tfp.math.psd_kernels.MaternOneHalf(amplitude=[.2, .5])
+batch_kernel.batch_shape
+# ==> [2]
+batch_kernel.apply(x, y).shape
+# ==> Error! [2] and [5] can't broadcast.
+
+#batched kernel, make batched params 2x1
+batch_kernel = tfp.math.psd_kernels.MaternOneHalf(amplitude=[[.2], [.5]])
+batch_kernel.batch_shape
+# ==> [2,1]
+batch_kernel.apply(x, y).shape
+# ==> [2, 5]
+
+#By specifying example_ndims, which tells the kernel to treat the 5 in the input shape as part of the "example shape", and "pushing" the kernel batch shape to the left:
+batch_kernel = tfp.math.psd_kernels.MaternOneHalf(amplitude=[.2, .5])
+batch_kernel.batch_shape
+# ==> [2]
+batch_kernel.apply(x, y, example_ndims=1).shape  #1 is the index of the lengh of samples
+# ==> [2, 5]
+
+
+#example dims
+scalar_kernel = tfp.math.psd_kernels.MaternOneHalf(amplitude=1)
+scalar_kernel.batch_shape
+# ==> []
+
+# `x` and `y` are batches of 3-D vectors:
+x = np.ones([5, 3], np.float32)
+y = np.ones([4, 3], np.float32)
+scalar_kernel.matrix(x, y).shape
+# ==> [5, 4]  # 5rows x, 4 cols y
+
+
+
+# Now consider a kernel with batched parameters with the same inputs
+
+batch_kernel = tfp.math.psd_kernels.MaternOneHalf(amplitude=[1., .5])
+batch_kernel.batch_shape
+# ==> [2]
+
+batch_kernel.matrix(x, y).shape
+# ==> [2, 5, 4]
+#result is 2 batched matrices
+
+# Now consider a kernel with batched parameters.
+batch_kernel = tfp.math.psd_kernels.MaternOneHalf(amplitude=[1., .5])
+batch_kernel.batch_shape
+# ==> [2]
+
+# Inputs are two rank-2 collections of 3-D vectors
+# 5 matrices of 6 points of 3d vectors
+x = np.ones([5, 6, 3], np.float32)
+y = np.ones([7, 8, 3], np.float32)
+#x1_example_ndims index of x numberof features of x
+batch_kernel.tensor(x, y, x1_example_ndims=2, x2_example_ndims=2).shape
+# ==> [2, 5, 6, 7, 8]
+
+
+
+
+
+# Now consider a kernel with batched parameters.
+batch_kernel = tfp.math.psd_kernels.MaternOneHalf(amplitude=[1., .5])
+batch_kernel.batch_shape
+# ==> [2]
+
+# Inputs are two rank-2 collections of 3-D vectors
+# 5 matrices of 6 points of 3d vectors
+x = np.ones([6, 3], np.float32)
+y = np.ones([8, 3], np.float32)
+#x1_example_ndims index of x numberof features of x
+batch_kernel.tensor(x, y, x1_example_ndims=1, x2_example_ndims=1).shape
+# TensorShape([2, 6, 8])
+
+
+
+
+
+
+
+
+# x_train = np.asarray([[1.0,2.0,3.0,4.0,5.0],[8.0,10.0,2.0,7.0,10.0],[2.0,2.0,5.0,9.0,11.0]])
+#100 samples of 5 element arrays
+x_train = np.random.rand(100,5)
+y_train = np.random.rand(100,5) #np.asarray([[1.0],[5.0],[3.0]])
+
+# x_range = [[min(x_train.T[i]) for i in range(len(x_train[0]))],[max(x_train.T[i]) for i in range(len(x_train[0]))]]
+
+# k = tfp.math.psd_kernels.MaternOneHalf(amplitude=0.1,length_scale=0.1, feature_ndims=5)
+k = tfp.math.psd_kernels.MaternOneHalf(amplitude=tf.constant([0.1,0.1,0.1,0.1,0.1]),length_scale=tf.constant([0.1,0.1,0.1,0.1,0.1]))
+
+k.batch_shape
+k.feature_ndims
+k.variables
+#x1_example_ndims index of x numberof features of x
+k.tensor(x_train, y_train, x1_example_ndims=1, x2_example_ndims=1).shape
+
+
+eq_indices = [0,1,3]
+periodic_indices = [2,4]
+#batch?
+eq_kernel = tfp.math.psd_kernels.FeatureTransformed(
+    tfp.math.psd_kernels.ExponentiatedQuadratic(amplitude=tf.constant([2.0, 3.0, 4.0]),
+      length_scale=tf.constant([2.0, 3.0, 4.0])),
+    # transformation_fn=lambda x: tf.gather(x, eq_indices, axis=-1))
+    transformation_fn=lambda x, _: tf.gather(x, eq_indices, axis=-1))
+periodic_kernel = tfp.math.psd_kernels.FeatureTransformed(
+    tfp.math.psd_kernels.ExpSinSquared(amplitude=tf.constant([2.0, 3.0]),
+      length_scale=tf.constant([3.0, 4.0])),
+    # transformation_fn=lambda x: tf.gather(x, periodic_indices, axis=-1))
+    transformation_fn=lambda x, _: tf.gather(x, periodic_indices, axis=-1))
+kernel = eq_kernel + periodic_kernel
+
+
+
+######
+base_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(amplitude=2., length_scale=1.)
+
+same_kernel = tfp.math.psd_kernels.FeatureTransformed(
+    base_kernel,
+    transformation_fn=lambda x, _: x)
+same_kernel.tensor(x_train, y_train, x1_example_ndims=1, x2_example_ndims=1).shape
+
+# kernel = tfp.math.psd_kernels.ExpSinSquared(amplitude=tf.constant([2.0]),
+       # length_scale=tf.constant([4.0]))
+
+kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(amplitude=tf.constant([2.0, 3.0, 4.0, 2.0, 3.0]),
+      length_scale=tf.constant([2.0, 3.0, 4.0, 2.0, 3.0]))+ tfp.math.psd_kernels.ExpSinSquared(amplitude=tf.constant([2.0, 3.0, 3.0, 4.0, 2.0]),
+      length_scale=tf.constant([3.0, 4.0, 3.0, 4.0, 2.0]))
+
+#try scaling thekernel
+kscale = tfp.math.psd_kernels.FeatureScaled(
+    kernel, scale_diag=5, validate_args=False, name='FeatureScaled'
+)
+kscale.batch_shape
+
+
+
+
+#%%
+# sample 264 random input locations in 3d unit cube
+x_ = np.random.uniform(size=[264, 3])
+# sample 4 batches of 264 output values. note that i've ordered these differently
+# than you have them.
+y_ = np.random.uniform(size=[4, 264])
+
+amplitudes = tf.Variable(np.random.uniform(size = 4), "amplitudes")
+# *NOT* ARD yet, just a batch of 4 independent values 
+length_scales = tf.Variable(np.random.uniform(size = 4), "length_scale")
+
+kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    amplitude=amplitudes,
+    length_scale=length_scales)
+print(kernel.batch_shape)
+#  ==> [4]
+
+gp = tfp.distributions.GaussianProcess(
+    kernel=kernel,
+    index_points=x_)
+print(gp.batch_shape)
+#  ==> [4]
+print(gp.event_shape)
+# ==> [264]
+
+print(gp.sample(20).shape)
+# ==> [20, 4, 264]
+
+# Now we can take the log probs of our observations -- we get 4 results, which
+# represent the 4 individual log probs of the observations according to the respective
+# GP models in the batch.
+print(gp.log_prob(y_).shape)
+# ==> [4]
+
+# Now, if you want to consider this as a "joint" model over the 4 outputs, we can use
+# the Independent meta-distribution to "reinterpret" batch dims as event dims.
+joint_gp = tfp.distributions.Independent(gp, reinterpreted_batch_ndims=1)
+print(joint_gp.batch_shape)
+# ==> []
+print(joint_gp.event_shape)
+# ==> [4, 264]
+
+# And this will give a scalar result.
+print(joint_gp.log_prob(y_).shape)
+# ==> []
+
+
+
+class InputTransformedKernel(tfp.math.psd_kernels.ExponentiatedQuadratic):
+
+  def __init__(self, kernel, transformation, name='InputTransformedKernel'):
+    self._kernel = kernel
+    self._transformation = transformation
+    super(InputTransformedKernel, self).__init__(
+        feature_ndims=kernel.feature_ndims,
+        dtype=kernel.dtype,
+        name=name)
+
+  def apply(self, x1, x2):
+    return self._kernel.apply(
+        self._transformation(x1),
+        self._transformation(x2))
+
+  def matrix(self, x1, x2):
+    return self._kernel.matrix(
+        self._transformation(x1),
+        self._transformation(x2))
+
+  @property
+  def batch_shape(self):
+    return self._kernel.batch_shape
+
+  def batch_shape_tensor(self):
+    return self._kernel.batch_shape_tensor
+
+class InputScaledKernel(InputTransformedKernel):
+
+  def __init__(self, kernel, length_scales):
+    super(InputScaledKernel, self).__init__(
+        kernel,
+        lambda x: x / tf.expand_dims(length_scales,
+                                     -(kernel.feature_ndims + 1)))
+    
+#https://github.com/pyro-ppl/pyro/issues/1679
+class ARDKernelTest(tf.test.TestCase):
+
+  def testARD(self):
+    num_examples = 264
+    num_features = 3
+    num_outputs = 4
+    x_ = np.random.uniform(size=[num_examples, num_features])
+    y_ = np.random.uniform(size=[num_outputs, num_examples])
+
+    amplitude = np.random.uniform(size=[num_outputs])
+    length_scales = np.random.uniform(size=[num_outputs, num_features])
+
+    se_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(amplitude)
+    kernel = InputScaledKernel(se_kernel, length_scales)
+
+    tfd = tfp.distributions
+    gp = tfd.GaussianProcess(kernel, index_points=x_)
+
+    self.assertAllEqual([num_outputs], kernel.batch_shape.as_list())
+    self.assertAllEqual([num_outputs], gp.batch_shape)
+    self.assertAllEqual([num_examples], gp.event_shape)
+
+    joint_gp = tfd.Independent(gp, reinterpreted_batch_ndims=1)
+    self.assertAllEqual([], joint_gp.batch_shape)
+    self.assertAllEqual([num_outputs, num_examples],
+                        joint_gp.event_shape.as_list())   
+    
+    
+#%%
+#https://colab.research.google.com/gist/csuter/15875ffc94b647bdcc2e89bf9ca0bfbd/ard-gp-for-starfish.ipynb#scrollTo=DLXgOQKrnmRg
+import itertools
+import numpy as np
+import tensorflow as tf
+import tensorflow_probability as tfp
+tfd = tfp.distributions
+tfk = tfp.math.psd_kernels
+
+
+class InputTransformedKernel(tfk.PositiveSemidefiniteKernel):
+
+    def __init__(self, kernel, transformation, name='InputTransformedKernel'):
+        self._kernel = kernel
+        self._transformation = transformation
+        super().__init__(
+            feature_ndims=kernel.feature_ndims,
+            dtype=kernel.dtype,
+            name=name)
+
+    def apply(self, x1, x2):
+        return self._kernel.apply(
+            self._transformation(x1),
+            self._transformation(x2))
+
+    def matrix(self, x1, x2):
+        return self._kernel.matrix(
+            self._transformation(x1),
+            self._transformation(x2))
+
+    @property
+    def batch_shape(self):
+        return self._kernel.batch_shape
+
+    def batch_shape_tensor(self):
+        return self._kernel.batch_shape_tensor
+
+class InputScaledKernel(InputTransformedKernel):
+
+    def __init__(self, kernel, length_scales, name):
+      length_scales = tf.expand_dims(
+          length_scales,
+          axis=-(kernel.feature_ndims + 1))
+      def _transformation(x):
+        return x / length_scales
+      super().__init__(
+          kernel=kernel,
+          transformation=_transformation,
+          name=name)
+      
+      
+ # Generate the input locations and some other values from
+# https://www.dropbox.com/s/ootq273spfj1q5d/testPCA.hdf5
+# The (rather big array of) output values are hardcoded in the cell above
+a_ = np.concatenate(
+    [np.linspace(5700, 6900, 13, dtype=np.float64),
+     np.linspace(7000, 8600, 9, dtype=np.float64)], axis=0)
+b_ = np.linspace(4., 5.5, 4, dtype=np.float64)
+c_ = np.linspace(-5., 5., 3, dtype=np.float64)
+X = np.array(list(itertools.product(a_, b_, c_)))
+output_values = np.random.uniform(size=[264,2])
+Y = tf.constant(output_values)
+conf_priors = np.array([[2., 2., 2.], [0.0075, 0.75, 0.75]])
+
+# Create the trainable variables in our model. Constrain to be strictly
+# positive by wrapping in softplus and adding a little nudge away from zero.
+amplitude = (np.finfo(np.float64).tiny +
+             tf.nn.softplus(
+                 tf.Variable(10. * tf.ones(2, dtype=tf.float64)),
+                 name='amplitude'))
+length_scale = (np.finfo(np.float64).tiny +
+                tf.nn.softplus(
+                    tf.Variable([300., 30.], dtype=np.float64),
+                    name='length_scale'))
+
+# Put Gamma prior on the length scales
+rv_scale = tfd.Gamma(
+    concentration=conf_priors[0],
+    rate=conf_priors[1],
+    name='length_scale_prior')
+
+
+# Define ARD kernel and GP likelihood over observations
+kernel = InputScaledKernel(tfk.ExponentiatedQuadratic(amplitude),
+                           length_scale,
+                           name='ARD_kernel')
+gp = tfd.Independent(
+    tfd.GaussianProcess(kernel=kernel, index_points=X),
+    reinterpreted_batch_ndims=1)
+
+# Joint log prob of length_scale params and data
+log_likelihood = (gp.log_prob(Y) +
+                  tf.reduce_sum(rv_scale.log_prob(length_scale)))
+
+print(gp.log_prob(Y))
+
+
+# Optimization target (neg log likelihood) and optimizer. Use a fairly
+# generous learning rate (adaptive optimizer will adapt :))
+loss = -log_likelihood
+opt = tf.train.AdamOptimizer(.1).minimize(loss)
+
+# Train and plot losses
+num_iters = 1000
+losses_ = np.zeros(num_iters, np.float32)
+with tf.Session() as sess:
+  sess.run(tf.global_variables_initializer())
+  for i in range(num_iters):
+    _, losses_[i] = sess.run([opt, loss])
+
+plt.plot(losses_)
+_()     
+    
+
+#%%
+def kernel(X1, X2, l=1.0, sigma_f=1.0):
+    '''
+    Isotropic squared exponential kernel. Computes 
+    a covariance matrix from points in X1 and X2.
+        
+    Args:
+        X1: Array of m points (m x d).
+        X2: Array of n points (n x d).
+
+    Returns:
+        Covariance matrix (m x n).
+    '''
+    sqdist = np.sum(X1**2, 1).reshape(-1, 1) + np.sum(X2**2, 1) - 2 * np.dot(X1, X2.T)
+    return sigma_f**2 * np.exp(-0.5 / l**2 * sqdist)
+
+
+
+# from gaussian_processes_util import plot_gp
+
+# Finite number of points
+X = np.arange(-5, 5, 0.2).reshape(-1, 1)
+
+# Mean and covariance of the prior
+mu = np.zeros(X.shape)
+cov = kernel(X, X)
+
+# Draw three samples from the prior
+samples = np.random.multivariate_normal(mu.ravel(), cov, 3)
+
+# Plot GP mean, confidence interval and samples 
+# plot_gp(mu, cov, X, samples=samples)
+
+from numpy.linalg import inv
+
+def posterior_predictive(X_s, X_train, Y_train, l=1.0, sigma_f=1.0, sigma_y=1e-8):
+    '''  
+    Computes the suffifient statistics of the GP posterior predictive distribution 
+    from m training data X_train and Y_train and n new inputs X_s.
+    
+    Args:
+        X_s: New input locations (n x d).
+        X_train: Training locations (m x d).
+        Y_train: Training targets (m x 1).
+        l: Kernel length parameter.
+        sigma_f: Kernel vertical variation parameter.
+        sigma_y: Noise parameter.
+    
+    Returns:
+        Posterior mean vector (n x d) and covariance matrix (n x n).
+    '''
+    K = kernel(X_train, X_train, l, sigma_f) + sigma_y**2 * np.eye(len(X_train))
+    K_s = kernel(X_train, X_s, l, sigma_f)
+    K_ss = kernel(X_s, X_s, l, sigma_f) + 1e-8 * np.eye(len(X_s))
+    K_inv = inv(K)
+    
+    # Equation (4)
+    mu_s = K_s.T.dot(K_inv).dot(Y_train)
+
+    # Equation (5)
+    cov_s = K_ss - K_s.T.dot(K_inv).dot(K_s)
+    
+    return mu_s, cov_s
+
+
+# X = np.arange(-5, 5, 0.2).reshape(-1, 1)
+X = np.arange(-5, 5, 0.1).reshape(-1, 2) #50x2
+
+# Noise free training data
+# X_train = np.array([-4, -3, -2, -1, 1]).reshape(-1, 1)
+X_train = np.array([-4, -3, -2, -1, 1,-4, -3, -2, -1, 1]).reshape(-1, 2) #5x2
+Y_train = np.sin(X_train)
+
+# Compute mean and covariance of the posterior predictive distribution
+mu_s, cov_s = posterior_predictive(X, X_train, Y_train)
+
+samples = np.random.multivariate_normal(mu_s.ravel(), cov_s, 3)
+
+
+
+
+#higher dim
+from scipy.optimize import minimize
+from numpy.linalg import cholesky, det, lstsq
+
+
+def nll_fn(X_train, Y_train, noise, naive=True):
+    '''
+    Returns a function that computes the negative log marginal
+    likelihood for training data X_train and Y_train and given 
+    noise level.
+    
+    Args:
+        X_train: training locations (m x d).
+        Y_train: training targets (m x 1).
+        noise: known noise level of Y_train.
+        naive: if True use a naive implementation of Eq. (7), if 
+               False use a numerically more stable implementation. 
+        
+    Returns:
+        Minimization objective.
+    '''
+    def nll_naive(theta):
+        # Naive implementation of Eq. (7). Works well for the examples 
+        # in this article but is numerically less stable compared to 
+        # the implementation in nll_stable below.
+        K = kernel(X_train, X_train, l=theta[0], sigma_f=theta[1]) + \
+            noise**2 * np.eye(len(X_train))
+        return 0.5 * np.log(det(K)) + \
+               0.5 * Y_train.T.dot(inv(K).dot(Y_train)) + \
+               0.5 * len(X_train) * np.log(2*np.pi)
+
+    def nll_stable(theta):
+        # Numerically more stable implementation of Eq. (7) as described
+        # in http://www.gaussianprocess.org/gpml/chapters/RW2.pdf, Section
+        # 2.2, Algorithm 2.1.
+        K = kernel(X_train, X_train, l=theta[0], sigma_f=theta[1]) + \
+            noise**2 * np.eye(len(X_train))
+        L = cholesky(K)
+        return np.sum(np.log(np.diagonal(L))) + \
+               0.5 * Y_train.T.dot(lstsq(L.T, lstsq(L, Y_train)[0])[0]) + \
+               0.5 * len(X_train) * np.log(2*np.pi)
+    
+    if naive:
+        return nll_naive
+    else:
+        return nll_stable
+
+
+noise_2D = 0.1
+
+rx, ry = np.arange(-5, 5, 0.3), np.arange(-5, 5, 0.3)
+gx, gy = np.meshgrid(rx, rx)
+
+X_2D = np.c_[gx.ravel(), gy.ravel()]
+
+X_2D_train = np.random.uniform(-4, 4, (100, 2))#100x2
+Y_2D_train = np.sin(0.5 * np.linalg.norm(X_2D_train, axis=1)) + \
+             noise_2D * np.random.randn(len(X_2D_train))#100x1
+
+# plt.figure(figsize=(14,7))
+
+mu_s, _ = posterior_predictive(X_2D, X_2D_train, Y_2D_train, sigma_y=noise_2D)
+# plot_gp_2D(gx, gy, mu_s, X_2D_train, Y_2D_train, 
+           # f'Before parameter optimization: l={1.00} sigma_f={1.00}', 1)
+
+res = minimize(nll_fn(X_2D_train, Y_2D_train, noise_2D), [1, 1], 
+               bounds=((1e-5, None), (1e-5, None)),
+               method='L-BFGS-B')
+
+mu_s, _ = posterior_predictive(X_2D, X_2D_train, Y_2D_train, *res.x, sigma_y=noise_2D)
+# plot_gp_2D(gx, gy, mu_s, X_2D_train, Y_2D_train,
+           # f'After parameter optimization: l={res.x[0]:.2f} sigma_f={res.x[1]:.2f}', 2)
+
+
+
+#%%
+
+class RBFKernelFn(tf.keras.layers.Layer):
+  def __init__(self, **kwargs):
+    super(RBFKernelFn, self).__init__(**kwargs)
+    dtype = kwargs.get('dtype', None)
+
+    self._amplitude = self.add_variable(
+            initializer=tf.constant_initializer(0.0),
+            dtype=dtype,
+            name='amplitude')
+    
+    self._length_scale = self.add_variable(
+            # initializer=tf.keras.initializers(tf.constant([0.0,0.0,0.0,0.0,0.0])),
+            initializer=tf.constant_initializer(0.0),
+            dtype=dtype,
+            name='length_scale')
+
+  def call(self, x):
+    # Never called -- this is just a layer so it can hold variables
+    # in a way Keras understands.
+    return x
+
+  @property
+  def kernel(self):
+    return tfp.math.psd_kernels.MaternOneHalf(
+      # amplitude=tf.nn.softplus([0.1,0.1,0.1,0.1,0.1] * self._amplitude),
+      # length_scale=tf.nn.softplus([1.0,1.0,1.0,1.0,1.0] * self._length_scale), feature_ndims=5
+      amplitude=tf.nn.softplus(0.1* self._amplitude),
+      length_scale=tf.nn.softplus(1.0 * self._length_scale))
+
+#%%
+
+# Suppose we have some data from a known function. Note the index points in
+# general have shape `[b1, ..., bB, f1, ..., fF]` (here we assume `F == 1`),
+# so we need to explicitly consume the feature dimensions (just the last one
+# here).
+# f = lambda x: np.sin(10*x[..., 0]) * np.exp(-x[..., 0]**2)
+# observed_index_points = np.expand_dims(np.random.uniform(-1., 1., 50), -1)
+# # Squeeze to take the shape from [50, 1] to [50].
+# observed_values = f(observed_index_points)
+
+#############################################################################
+
+
+
+observed_index_points = x_train #(100, 5)
+observed_values = y_train.T #(5, 100)
+
+# Define a kernel with trainable parameters.
+kernel = tfp.math.psd_kernels.MaternOneHalf(
+    amplitude=tf.Variable([[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]], dtype=np.float64, name='amplitude'),
+    length_scale=tf.Variable([[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]], dtype=np.float64, name='length_scale'))
+
+# kernel = tfp.math.psd_kernels.MaternOneHalf(
+#     amplitude=tf.Variable(tf.ones(5,dtype=np.float64), dtype=np.float64, name='amplitude'),
+#     length_scale=tf.Variable(tf.ones(5,dtype=np.float64), dtype=np.float64, name='length_scale'))
+
+gp = tfd.GaussianProcess(kernel, observed_index_points)
+
+optimizer = tf.optimizers.Adam()
+
+@tf.function
+def optimize():
+  with tf.GradientTape() as tape:
+    loss = -gp.log_prob(observed_values)
+  grads = tape.gradient(loss, gp.trainable_variables)
+  optimizer.apply_gradients(zip(grads, gp.trainable_variables))
+  return loss
+
+
+for i in range(1000):
+  neg_log_likelihood = optimize()
+  if i % 100 == 0:
+    print("Step {}: NLL = {}".format(i, neg_log_likelihood))
+print("Final NLL = {}".format(neg_log_likelihood))
+
+#set amp and length for rbf function
+print(gp.trainable_variables)
+amplitude_opt,length_scale_opt = gp.trainable_variables
+amplitude_opt = amplitude_opt.numpy()
+length_scale_opt = length_scale_opt.numpy()
+
+class RBFKernelFn_opt(tf.keras.layers.Layer):
+  def __init__(self, **kwargs):
+    super(RBFKernelFn, self).__init__(**kwargs)
+    dtype = kwargs.get('dtype', None)
+
+    self._amplitude = self.add_variable(
+            initializer=tf.constant_initializer(0.0),
+            dtype=dtype,
+            name='amplitude')
+    
+    self._length_scale = self.add_variable(
+            # initializer=tf.keras.initializers(tf.constant([0.0,0.0,0.0,0.0,0.0])),
+            initializer=tf.constant_initializer(0.0),
+            dtype=dtype,
+            name='length_scale')
+
+  def call(self, x):
+    # Never called -- this is just a layer so it can hold variables
+    # in a way Keras understands.
+    return x
+
+  @property
+  def kernel(self):
+    return tfp.math.psd_kernels.MaternOneHalf(
+      # amplitude=tf.nn.softplus([0.1,0.1,0.1,0.1,0.1] * self._amplitude),
+      # length_scale=tf.nn.softplus([1.0,1.0,1.0,1.0,1.0] * self._length_scale), feature_ndims=5
+      amplitude=tf.nn.softplus(amplitude_opt* self._amplitude),
+      length_scale=tf.nn.softplus(length_scale_opt* self._length_scale))
+
+
+tf.keras.backend.set_floatx('float64')
+batch_size = 20
+num_inducing_points = 20
+loss = lambda y, rv_y: rv_y.variational_loss(
+    y, kl_weight=np.array(batch_size) / x_train.shape[0])
+
+
+def build_model():
+    #model=models.Sequential()
+    model = Sequential()
+    model.add(layers.Dense(x_train.shape[1],activation='sigmoid', input_shape=(x_train.shape[1],)))
+
+
+    #no gP layer
+    # model.add(layers.Dense(train_targets.shape[1]))
+    model.add(tfp.layers.VariationalGaussianProcess(
+        num_inducing_points=num_inducing_points,
+        kernel_provider=RBFKernelFn(),
+        # kernel_provider=TestKernelFn(),
+        # kernel=optimized_kernel,
+        event_shape=[y_train.shape[1]],#outputshape
+        inducing_index_points_initializer=tf.constant_initializer(y_train.shape[1]*[np.linspace(*x_range,num_inducing_points,dtype='float64')]),
+        unconstrained_observation_noise_variance_initializer=(
+            tf.constant_initializer(0.1))))
+
+    model.compile(optimizer=optimizers.Adam(lr=0.01),loss='mse',metrics=['mae','mse']) 
+    #model.compile(optimizer='adam',loss='mse',metrics=['mae']) 
+    return model
+
+
+model=build_model()
+
+history=model.fit(x_train,y_train,epochs=15,batch_size=batch_size,verbose=1)
+mae_history=history.history['val_mae']
+mae_history_train=history.history['mae']
+# test_mse_score,test_mae_score,tempp=model.evaluate(x_test,y_test)
+
+
+#%%
+
+tf.keras.backend.set_floatx('float64')
+
+batch_size = 20
+num_inducing_points = 40
+loss = lambda y, rv_y: rv_y.variational_loss(
+    y, kl_weight=np.array(batch_size, x_train.dtype) / x_train.shape[0])
+
+
+def build_model():
+    #model=models.Sequential()
+    model = Sequential()
+    model.add(layers.Dense(x_train.shape[1],activation='sigmoid', input_shape=(x_train.shape[1],)))
+
+
+    #no gP layer
+    # model.add(layers.Dense(train_targets.shape[1]))
+    model.add(tfp.layers.VariationalGaussianProcess(
+        num_inducing_points=num_inducing_points,
+        kernel_provider=RBFKernelFn(),
+        # kernel_provider=TestKernelFn(),
+        # kernel=optimized_kernel,
+        event_shape=[y_train.shape[1]],#outputshape
+        inducing_index_points_initializer=tf.constant_initializer(y_train.shape[1]*[np.linspace(*x_range,num_inducing_points,dtype='float64')]),
+        unconstrained_observation_noise_variance_initializer=tf.constant_initializer(np.array(0.54).astype(x_train.dtype))))
+
+    model.compile(optimizer=optimizers.Adam(lr=0.01),loss='mse',metrics=['mae','mse']) 
+    #model.compile(optimizer='adam',loss='mse',metrics=['mae']) 
+    return model
+
+
+model=build_model()
+
+
+#fit the model
+history=model.fit(x_train,y_train,epochs=15,verbose=1)
+mae_history=history.history['val_mae']
+mae_history_train=history.history['mae']
+# test_mse_score,test_mae_score,tempp=model.evaluate(x_test,y_test)
+
+
+
