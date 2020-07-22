@@ -6,54 +6,318 @@ Created on Mon Jul 20 16:38:02 2020
 @author: aklimasewski
 """
 import shapely
+import shapely.geometry
 import geopy
+import geopy.distance
 import numpy as np
 from preprocessing import transform_dip, readindata, transform_data
-
+import matplotlib.pyplot as plt
+import shapely.geometry
+import pandas as pd
+from matplotlib import cm
+import matplotlib as mpl
+from sklearn.preprocessing import Normalizer
+import random
 #grid up residuals
 
 
-dx=0.05
-lon = np.arange(-119.5,-116.5, dx)
-lat = np.arange(33.25, 35.25, dx)
-longrid, latgrid = np.meshgrid(lon,lat)
+dx=0.1
+# lon = np.arange(-119.5,-116.5, dx)
+# lat = np.arange(33.25, 35.25, dx)
+
+lon = np.arange(-121,-115.5, dx)
+lat = np.arange(32, 37.5, dx)
+# longrid, latgrid = np.meshgrid(lon,lat)
 # 
 
+latmid = []
+lonmid = []
 polygons = []
 for i in range(len(lon)-1):
     for j in range(len(lat)-1):
-        print(lat[j], lon[i], lat[j+1], lon[i+1])
+        # print(lat[j], lon[i], lat[j+1], lon[i+1])
         polygon_points = [(lon[i], lat[j]), (lon[i], lat[j+1]), (lon[i+1], lat[j+1]), (lon[i+1], lat[j]), (lon[i], lat[j])]
         shapely_poly = shapely.geometry.Polygon(polygon_points)
         polygons.append(shapely_poly)
-          
+        latmid.append((lat[j]+lat[j+1])/2.)
+        lonmid.append((lon[i]+lon[i+1])/2.)
+        
+        
+# n= len(lon)*len(lat)
+# df = pd.DataFrame(np.array([polygons, latmid, lonmid]),
+#                    columns=['polygon', 'latmid', 'lonmid'])
+         
+d = {'polygon': polygons, 'latmid': latmid, 'lonmid': lonmid}
+df = pd.DataFrame(data=d)    
+
+
+
 
 train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n=6)
   
-sitelat = train_data1[:,1]
-sitelon = train_data1[:,2]
-evlat = train_data1[:,3]
-evlon = train_data1[:,4]
 
-                      
+
+#choose random subset for fast testing
+randindex = random.sample(range(0, len(train_data1)), 1000)
+sitelat = train_data1[:,1][randindex]
+sitelon = train_data1[:,2][randindex]
+evlat = train_data1[:,3][randindex]
+evlon = train_data1[:,4][randindex]
+target = train_targets1[:,0][randindex]
+gridded_targets_sum = np.zeros(df.shape[0])
+# gridded_targets_list = np.zeros(shape=(df.shape[0],1))
+gridded_targets_list = [ [] for _ in range(df.shape[0]) ]
+
+gridded_counts = np.zeros(df.shape[0])
+lenlist = []
+            
 #loop through each record     
 for i in range(len(sitelat)):                         
     line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
     path=shapely.geometry.LineString(line)
-    
-    for j in range(len(polygons)):
+    #loop through each grid cell
+    for j in range(len(df)):
         shapely_poly = polygons[j]
         if path.intersects(shapely_poly) == True:
             shapely_line = shapely.geometry.LineString(line)
             intersection_line = list(shapely_poly.intersection(shapely_line).coords)
-                        
-                                  
- 
+            if len(intersection_line)== 2:
+                coords_1 = (intersection_line[0][1], intersection_line[0][0])
+                coords_2 = (intersection_line[1][1], intersection_line[1][0])
+                length=geopy.distance.distance(coords_1, coords_2).km
+                gridded_targets_sum[j] += (target[i]/length)
+                print(gridded_targets_list[j],[target[i]/length]) 
+                # gridded_targets_list[j] = np.append(gridded_targets_list[j],[target[i]/length])                # print(target[i],length)
+                gridded_targets_list[j].append(target[i]/length)                # print(target[i],length)
+
+                
+                gridded_counts[j] += 1
+                lenlist.append(length)
+            # if gridded_targets_sum[j]<(-100.):
+            #         print('index: ', i)
+            #         print('length: ', length)
+            #         print('target: ', target[i])
+            #         print('counts: ', gridded_counts[j])
+            #         print('target sum: ', gridded_targets_sum[j])
+
+    
+#calculate mean in each cell, unless count is zero
+# gridded_mean= np.divide(gridded_targets_sum, gridded_counts, out=np.zeros_like(gridded_targets_sum), where=gridded_counts!=0)
+
+#find mean of norm residual
+gridded_targets_list = np.asarray(gridded_targets_list)
+gridded_mean=np.asarray([np.mean(gridded_targets_list[i]) for i in range(len(gridded_targets_list))])
+#find the cells with no paths (nans)
+nan_ind=np.argwhere(np.isnan(gridded_mean)).flatten()
+# set nan elements for empty array
+# not sureif this isbest orto leaveas a nan
+for i in nan_ind:
+    gridded_mean[i] =0
+
+
+#add gridded mean and gridded counts to df
+df['counts'] = gridded_counts
+df['meantarget'] =gridded_mean
+
+# residuals
+# np.asarra
+Z = gridded_mean.reshape(len(lat)-1,len(lon)-1)
+
+cbound = max(np.abs(gridded_mean))
+cmap = mpl.cm.get_cmap('seismic')
+normalize = mpl.colors.Normalize(vmin=-1*cbound, vmax=cbound)
+colors = [cmap(normalize(value)) for value in Z]
+s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
+s_m.set_array([])
+    
+fig, ax = plt.subplots(figsize = (10,8))
+plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
+plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
+plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
+plt.legend(loc = 'lower left')
+
+fig.subplots_adjust(right=0.75)
+cbar = plt.colorbar(s_m, orientation='vertical')
+cbar.set_label(r'average normalize residual (resid/km)', fontsize = 20)
+plt.show()
+
+
+
+# counts
+Z = gridded_counts.reshape(len(lat)-1,len(lon)-1)
+
+cbound = max(np.abs(gridded_counts))
+cmap = mpl.cm.get_cmap('Greens')
+normalize = mpl.colors.Normalize(vmin=0, vmax=cbound)
+colors = [cmap(normalize(value)) for value in Z]
+s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
+s_m.set_array([])
+
+fig, ax = plt.subplots(figsize = (10,8))
+plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
+plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
+plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
+plt.legend(loc = 'lower left')
+
+fig.subplots_adjust(right=0.75)
+cbar = plt.colorbar(s_m, orientation='vertical')
+cbar.set_label(r'paths per cell', fontsize = 20)
+plt.show()
+
+
+
+
+#histogram colorbar
+# fig.subplots_adjust(right=0.75)
+# cbar_ax = fig.add_axes([0.85, 0.18, 0.1, 0.63])
+
+# plt.ylabel(r'counts per cell', fontsize = 20)
+# plt.xlabel(r'path counts', fontsize = 20)
+
+# N, bins, patches = cbar_ax.hist(gridded_counts, orientation='horizontal')
+# for bin, patch in zip(bins, patches):
+#     color = cmap(normalize(bin))
+#     patch.set_facecolor(color)
+# plt.show()
+
+
+
+
+
+
+
+transform_method = Normalizer()
+
+aa=transform.fit(train_data1[:,:])
+train_data=aa.transform(train_data1)
+test_data=aa.transform(test_data1)
+
+# #plot transformed features
+# for i in range(len(train_data[0])):
+#     plt.figure(figsize =(8,8))
+#     plt.title('transformed feature: ' + str(feature_names[i]))
+#     plt.hist(train_data[:,i])
+#     plt.savefig(folder_path + 'histo_transformedfeature_' + str(feature_names[i]) + '.png')
+#     plt.show()
+
+train_targets = train_targets1
+test_targets = test_targets1
+
+# y_test = test_targets
+y_train = df['meantarget']
+
+x_train = df.drop(['polygon','counts','meantarget'], axis=1)
+# x_test = test_data
+
+# x_train_raw = train_data1
+# x_test_raw = test_data1
+
+
+
+transform = Normalizer()
+aa=transform.fit(x_train)
+train_data=aa.transform(x_train)
+# test_data=aa.transform(x_train)
+
+batch_size = 264
+
+def build_model():
+    model = Sequential()
+    model.add(layers.Dense(train_data.shape[1],activation='sigmoid', input_shape=(train_data.shape[1],)))
+
+    #no gP layer
+    model.add(layers.Dense(1))
+
+    model.compile(optimizer=optimizers.Adam(lr=0.01),loss='mse',metrics=['mae','mse']) 
+    return model
+
+
+model=build_model()
+
+#fit the model
+history=model.fit(train_data,y_train,epochs=100,batch_size=batch_size,verbose=1)
+
+# mae_history=history.history['val_mae']
+mae_history_train=history.history['mae']
+# test_mse_score,test_mae_score,tempp=model.evaluate(x_test,y_test)
+
+pre = model.predict(train_data)
+r = np.asarray(y_train)-pre.flatten()
+
+plt.figure()
+plt.scatter(np.asarray(y_train),pre.flatten())
+plt.xlim()
+plt.show()
+
+
+#%%
+
+
+# grid predictions
+Z = pre.reshape(len(lat)-1,len(lon)-1)
+
+cbound = max(np.abs(pre))
+cmap = mpl.cm.get_cmap('seismic')
+normalize = mpl.colors.Normalize(vmin=-1*cbound, vmax=cbound)
+colors = [cmap(normalize(value)) for value in Z]
+s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
+# s_m.set_array([])
+    
+fig = plt.figure(figsize = (10,8))
+plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
+plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
+plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
+plt.legend(loc = 'lower left')
+
+fig.subplots_adjust(right=0.75)
+cbar_ax = fig.add_axes([0.85, 0.18, 0.1, 0.63])
+
+plt.ylabel(r'counts per cell', fontsize = 20)
+plt.xlabel(r'path counts', fontsize = 20)
+
+N, bins, patches = cbar_ax.hist(gridded_counts, orientation='horizontal')
+for bin, patch in zip(bins, patches):
+    color = cmap(normalize(bin))
+    patch.set_facecolor(color)
+plt.show()
+
+
+
+
+
+
+
+
+
+#%%
+
+
+Z = np.random.rand(6, 10)
+x = np.arange(-0.5, 10, 1)  # len = 11
+y = np.arange(4.5, 11, 1)  # len = 7
+
+fig, ax = plt.subplots()
+ax.pcolormesh(x, y, Z)
+    
+    # for j in range(len(polygons)):
+    #     shapely_poly = polygons[j]
+    #     if path.intersects(shapely_poly) == True:
+    #         shapely_line = shapely.geometry.LineString(line)
+    #         intersection_line = list(shapely_poly.intersection(shapely_line).coords)
+    #         if len(intersection_line)== 2:
+    #             print(len(intersection_line))
+    #             coords_1 = (intersection_line[0][1], intersection_line[0][0])
+    #             coords_2 = (intersection_line[1][1], intersection_line[1][0])
+    #             length=geopy.distance.distance(coords_1, coords_2).km
+    #             gridded_targets += (target[i]/length)
+                
+
     
  
     
  
-    
+polygon_points = [(lon[i], lat[j]), (lon[i], lat[j+1]), (lon[i+1], lat[j+1]), (lon[i+1], lat[j]), (lon[i], lat[j])]
+
  
     
  

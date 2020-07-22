@@ -236,6 +236,17 @@ predict_epistemic_train_allT = np.std(predict_mean_train2, axis = 0)
 
 period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 
+##################
+target1_resid = (resid_train - mean_x_train_all) + 
+# target2 = resid_test
+
+# target2_residual = resid_test - mean_x_test_allT
+
+# target1_residual = resid_test +
+# target2_residual + mean_x_test_allT
+# 
+
+
 diff=np.std(resid_train - mean_x_train_allT,axis=0)
 difftest=np.std(resid_test-mean_x_test_allT,axis=0)
 # diffmean=np.mean(y_train-mean_x_train_allT,axis=0)

@@ -29,6 +29,7 @@ import os
 import cartopy
 import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
+import random
 
 import tensorflow_probability as tfp
 
