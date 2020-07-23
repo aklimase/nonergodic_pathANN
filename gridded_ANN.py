@@ -5,6 +5,7 @@ Created on Mon Jul 20 16:38:02 2020
 
 @author: aklimasewski
 """
+
 import shapely
 import shapely.geometry
 import geopy
@@ -18,17 +19,22 @@ from matplotlib import cm
 import matplotlib as mpl
 from sklearn.preprocessing import Normalizer
 import random
+import keras
+from keras.models import Sequential
+from sklearn.preprocessing import PowerTransformer
+from sklearn.preprocessing import Normalizer
 #grid up residuals
+import tensorflow.compat.v2 as tf
+tf.enable_v2_behavior()
+from keras import layers
+from keras import optimizers
 
 
 dx=0.1
-# lon = np.arange(-119.5,-116.5, dx)
-# lat = np.arange(33.25, 35.25, dx)
-
-lon = np.arange(-121,-115.5, dx)
+# lon = np.arange(-121,-115.5, dx)
+# lat = np.arange(32, 37.5, dx)
+lon = np.arange(-122,-115.5, dx)
 lat = np.arange(32, 37.5, dx)
-# longrid, latgrid = np.meshgrid(lon,lat)
-# 
 
 latmid = []
 lonmid = []
@@ -41,36 +47,30 @@ for i in range(len(lon)-1):
         polygons.append(shapely_poly)
         latmid.append((lat[j]+lat[j+1])/2.)
         lonmid.append((lon[i]+lon[i+1])/2.)
-        
-        
-# n= len(lon)*len(lat)
-# df = pd.DataFrame(np.array([polygons, latmid, lonmid]),
-#                    columns=['polygon', 'latmid', 'lonmid'])
-         
+           
 d = {'polygon': polygons, 'latmid': latmid, 'lonmid': lonmid}
 df = pd.DataFrame(data=d)    
 
-
-
-
 train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n=6)
-  
-
 
 #choose random subset for fast testing
-randindex = random.sample(range(0, len(train_data1)), 1000)
+randindex = random.sample(range(0, len(train_data1)), 20000)
+
+hypoR = train_data1[:,0][randindex]
 sitelat = train_data1[:,1][randindex]
 sitelon = train_data1[:,2][randindex]
 evlat = train_data1[:,3][randindex]
 evlon = train_data1[:,4][randindex]
 target = train_targets1[:,0][randindex]
+
+normtarget = target/hypoR
 gridded_targets_sum = np.zeros(df.shape[0])
-# gridded_targets_list = np.zeros(shape=(df.shape[0],1))
 gridded_targets_list = [ [] for _ in range(df.shape[0]) ]
+gridded_targetsnorm_list = [ [] for _ in range(df.shape[0]) ]
 
 gridded_counts = np.zeros(df.shape[0])
 lenlist = []
-            
+
 #loop through each record     
 for i in range(len(sitelat)):                         
     line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
@@ -86,27 +86,17 @@ for i in range(len(sitelat)):
                 coords_2 = (intersection_line[1][1], intersection_line[1][0])
                 length=geopy.distance.distance(coords_1, coords_2).km
                 gridded_targets_sum[j] += (target[i]/length)
-                print(gridded_targets_list[j],[target[i]/length]) 
-                # gridded_targets_list[j] = np.append(gridded_targets_list[j],[target[i]/length])                # print(target[i],length)
-                gridded_targets_list[j].append(target[i]/length)                # print(target[i],length)
+                gridded_targets_list[j].append(target[i]/length)          
+                gridded_targetsnorm_list[j].append(normtarget[i]*length)          
 
-                
                 gridded_counts[j] += 1
                 lenlist.append(length)
-            # if gridded_targets_sum[j]<(-100.):
-            #         print('index: ', i)
-            #         print('length: ', length)
-            #         print('target: ', target[i])
-            #         print('counts: ', gridded_counts[j])
-            #         print('target sum: ', gridded_targets_sum[j])
-
-    
-#calculate mean in each cell, unless count is zero
-# gridded_mean= np.divide(gridded_targets_sum, gridded_counts, out=np.zeros_like(gridded_targets_sum), where=gridded_counts!=0)
 
 #find mean of norm residual
 gridded_targets_list = np.asarray(gridded_targets_list)
 gridded_mean=np.asarray([np.mean(gridded_targets_list[i]) for i in range(len(gridded_targets_list))])
+# gridded_mean=np.asarray([np.median(gridded_targets_list[i]) for i in range(len(gridded_targets_list))])
+
 #find the cells with no paths (nans)
 nan_ind=np.argwhere(np.isnan(gridded_mean)).flatten()
 # set nan elements for empty array
@@ -114,16 +104,31 @@ nan_ind=np.argwhere(np.isnan(gridded_mean)).flatten()
 for i in nan_ind:
     gridded_mean[i] =0
 
+#find mean of norm residual
+gridded_targetsnorm_list = np.asarray(gridded_targetsnorm_list)
+griddednorm_mean=np.asarray([np.mean(gridded_targetsnorm_list[i]) for i in range(len(gridded_targetsnorm_list))])
+#find the cells with no paths (nans)
+nan_ind=np.argwhere(np.isnan(griddednorm_mean)).flatten()
+# set nan elements for empty array
+# not sureif this isbest orto leaveas a nan
+for i in nan_ind:
+    griddednorm_mean[i] =0
+
 
 #add gridded mean and gridded counts to df
 df['counts'] = gridded_counts
-df['meantarget'] =gridded_mean
+df['meantarget'] = gridded_mean
+df['normtarget'] = griddednorm_mean
+# df['hypoR'] = hypoR
+# df['sitelat']= sitelat
+# df['sitelon'] = sitelon
+# df['evlat'] = evlat
+# df['evlon'] = evlon
 
-# residuals
-# np.asarra
-Z = gridded_mean.reshape(len(lat)-1,len(lon)-1)
+# residuals norm
+Z = griddednorm_mean.reshape(len(lat)-1,len(lon)-1)
 
-cbound = max(np.abs(gridded_mean))
+cbound = max(np.abs(griddednorm_mean))
 cmap = mpl.cm.get_cmap('seismic')
 normalize = mpl.colors.Normalize(vmin=-1*cbound, vmax=cbound)
 colors = [cmap(normalize(value)) for value in Z]
@@ -138,10 +143,8 @@ plt.legend(loc = 'lower left')
 
 fig.subplots_adjust(right=0.75)
 cbar = plt.colorbar(s_m, orientation='vertical')
-cbar.set_label(r'average normalize residual (resid/km)', fontsize = 20)
+cbar.set_label(r'average normalized residual (resid/km)', fontsize = 20)
 plt.show()
-
-
 
 # counts
 Z = gridded_counts.reshape(len(lat)-1,len(lon)-1)
@@ -164,9 +167,6 @@ cbar = plt.colorbar(s_m, orientation='vertical')
 cbar.set_label(r'paths per cell', fontsize = 20)
 plt.show()
 
-
-
-
 #histogram colorbar
 # fig.subplots_adjust(right=0.75)
 # cbar_ax = fig.add_axes([0.85, 0.18, 0.1, 0.63])
@@ -182,31 +182,10 @@ plt.show()
 
 
 
-
-
-
-
-transform_method = Normalizer()
-
-aa=transform.fit(train_data1[:,:])
-train_data=aa.transform(train_data1)
-test_data=aa.transform(test_data1)
-
-# #plot transformed features
-# for i in range(len(train_data[0])):
-#     plt.figure(figsize =(8,8))
-#     plt.title('transformed feature: ' + str(feature_names[i]))
-#     plt.hist(train_data[:,i])
-#     plt.savefig(folder_path + 'histo_transformedfeature_' + str(feature_names[i]) + '.png')
-#     plt.show()
-
-train_targets = train_targets1
-test_targets = test_targets1
-
 # y_test = test_targets
-y_train = df['meantarget']
+y_train = df['normtarget']
 
-x_train = df.drop(['polygon','counts','meantarget'], axis=1)
+x_train = df.drop(['polygon','counts','meantarget','normtarget'], axis=1)
 # x_test = test_data
 
 # x_train_raw = train_data1
@@ -224,6 +203,7 @@ batch_size = 264
 def build_model():
     model = Sequential()
     model.add(layers.Dense(train_data.shape[1],activation='sigmoid', input_shape=(train_data.shape[1],)))
+    # model.add(layers.Dense(10))
 
     #no gP layer
     model.add(layers.Dense(1))
@@ -245,8 +225,11 @@ pre = model.predict(train_data)
 r = np.asarray(y_train)-pre.flatten()
 
 plt.figure()
+lim = np.max(np.asarray([abs(np.asarray(y_train)), abs(pre.flatten())]).flatten())
 plt.scatter(np.asarray(y_train),pre.flatten())
-plt.xlim()
+plt.xlim(-1*lim, lim)
+plt.ylim(-1*lim, lim)
+
 plt.show()
 
 

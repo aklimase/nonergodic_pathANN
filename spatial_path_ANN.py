@@ -53,7 +53,7 @@ tfk = tfp.math.psd_kernels
 
 #%%
 
-folder_path = '/Users/aklimasewski/Documents/12featuremodel/ANN_noGPlayer_pt/'
+folder_path = '/Users/aklimasewski/Documents/12featuremodel/ANN_12test/'
 
 if not os.path.exists(folder_path):
     os.makedirs(folder_path)
@@ -225,7 +225,7 @@ def transform_data(transform_method, train_data1, test_data1, train_targets1, te
 
 
 
-x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw, Rindex, Rtrain, Rtest = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path)
+x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path)
 # x_train = train_data[rand_ind_train]
 
 
