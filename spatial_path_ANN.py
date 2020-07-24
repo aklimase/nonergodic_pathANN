@@ -231,11 +231,8 @@ x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_
 
 #%%
 
-
 # create sequential model with positional inputs and predict 
-
 #try sequential with VGP layer
-
 # For numeric stability, set the default floating-point dtype to float64
 
 batch_size = 264

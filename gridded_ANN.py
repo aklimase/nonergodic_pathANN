@@ -29,84 +29,139 @@ tf.enable_v2_behavior()
 from keras import layers
 from keras import optimizers
 
+folder_path = '/Users/aklimasewski/Documents/gridded_ANN/10Tgrid_rand20000/'
 
-dx=0.1
-# lon = np.arange(-121,-115.5, dx)
-# lat = np.arange(32, 37.5, dx)
-lon = np.arange(-122,-115.5, dx)
-lat = np.arange(32, 37.5, dx)
+nsamples = 5000
 
-latmid = []
-lonmid = []
-polygons = []
-for i in range(len(lon)-1):
-    for j in range(len(lat)-1):
-        # print(lat[j], lon[i], lat[j+1], lon[i+1])
-        polygon_points = [(lon[i], lat[j]), (lon[i], lat[j+1]), (lon[i+1], lat[j+1]), (lon[i+1], lat[j]), (lon[i], lat[j])]
-        shapely_poly = shapely.geometry.Polygon(polygon_points)
-        polygons.append(shapely_poly)
-        latmid.append((lat[j]+lat[j+1])/2.)
-        lonmid.append((lon[i]+lon[i+1])/2.)
-           
-d = {'polygon': polygons, 'latmid': latmid, 'lonmid': lonmid}
-df = pd.DataFrame(data=d)    
-
-train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n=6)
-
+def create_grid(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.1):
+    dx=0.1
+    lon = np.arange(-121,-115.5, dx)
+    lat = np.arange(32, 37.5, dx)
+    
+    latmid = []
+    lonmid = []
+    polygons = []
+    for i in range(len(lon)-1):
+        for j in range(len(lat)-1):
+            polygon_points = [(lon[i], lat[j]), (lon[i], lat[j+1]), (lon[i+1], lat[j+1]), (lon[i+1], lat[j]), (lon[i], lat[j])]
+            shapely_poly = shapely.geometry.Polygon(polygon_points)
+            polygons.append(shapely_poly)
+            latmid.append((lat[j]+lat[j+1])/2.)
+            lonmid.append((lon[i]+lon[i+1])/2.)
+               
+    d = {'polygon': polygons, 'latmid': latmid, 'lonmid': lonmid}
+    df = pd.DataFrame(data=d)    
+    return df
+    
 #choose random subset for fast testing
-randindex = random.sample(range(0, len(train_data1)), 20000)
+def grid_data(train_data1, train_targets1, df, nsamples = 5000):
+    randindex = random.sample(range(0, len(train_data1)), nsamples)
+    
+    hypoR = train_data1[:,0][randindex]
+    sitelat = train_data1[:,1][randindex]
+    sitelon = train_data1[:,2][randindex]
+    evlat = train_data1[:,3][randindex]
+    evlon = train_data1[:,4][randindex]
+    target = train_targets1[:][randindex]
+    
+    normtarget = target / hypoR[:, np.newaxis]
+    gridded_targetsnorm_list = [ [] for _ in range(df.shape[0]) ]
+    
+    gridded_counts = np.zeros(df.shape[0])
+    lenlist = []
+    
+    #loop through each record     
+    for i in range(len(sitelat)):                         
+        line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
+        path=shapely.geometry.LineString(line)
+        #loop through each grid cell
+        for j in range(len(df)):
+            shapely_poly = df['polygon'][j]
+            if path.intersects(shapely_poly) == True:
+                shapely_line = shapely.geometry.LineString(line)
+                intersection_line = list(shapely_poly.intersection(shapely_line).coords)
+                if len(intersection_line)== 2:
+                    coords_1 = (intersection_line[0][1], intersection_line[0][0])
+                    coords_2 = (intersection_line[1][1], intersection_line[1][0])
+                    length=geopy.distance.distance(coords_1, coords_2).km
+                    gridded_targetsnorm_list[j].append(normtarget[i]*length)          
+                    gridded_counts[j] += 1
+                    lenlist.append(length)
+                
+        return hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts
+    
+    
+train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n=6)
+#start with defaults
+df = create_grid()
 
-hypoR = train_data1[:,0][randindex]
-sitelat = train_data1[:,1][randindex]
-sitelon = train_data1[:,2][randindex]
-evlat = train_data1[:,3][randindex]
-evlon = train_data1[:,4][randindex]
-target = train_targets1[:,0][randindex]
+hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts = grid_data(train_data1, train_targets1, df, nsamples = 5000)           
+#%%
+# #test data
+# randindex = random.sample(range(0, len(test_data1)), 5000)
 
-normtarget = target/hypoR
-gridded_targets_sum = np.zeros(df.shape[0])
-gridded_targets_list = [ [] for _ in range(df.shape[0]) ]
-gridded_targetsnorm_list = [ [] for _ in range(df.shape[0]) ]
+# hypoR = test_data1[:,0][randindex]
+# sitelat = test_data1[:,1][randindex]
+# sitelon = test_data1[:,2][randindex]
+# evlat = test_data1[:,3][randindex]
+# evlon = test_data1[:,4][randindex]
+# # target = train_targets1[:,5][randindex]
+# target_test = test_targets1[:][randindex]
 
-gridded_counts = np.zeros(df.shape[0])
-lenlist = []
+# # normtarget = target/hypoR
+# normtarget_test = target_test / hypoR[:, np.newaxis]
+# # gridded_targets_sum = np.zeros(df.shape[0])
+# gridded_targetsnorm_list_test = [ [] for _ in range(5000) ]
+# # gridded_targets_list = [ np.ones(10) for _ in range(df.shape[0]) ]
 
-#loop through each record     
-for i in range(len(sitelat)):                         
-    line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
-    path=shapely.geometry.LineString(line)
-    #loop through each grid cell
-    for j in range(len(df)):
-        shapely_poly = polygons[j]
-        if path.intersects(shapely_poly) == True:
-            shapely_line = shapely.geometry.LineString(line)
-            intersection_line = list(shapely_poly.intersection(shapely_line).coords)
-            if len(intersection_line)== 2:
-                coords_1 = (intersection_line[0][1], intersection_line[0][0])
-                coords_2 = (intersection_line[1][1], intersection_line[1][0])
-                length=geopy.distance.distance(coords_1, coords_2).km
-                gridded_targets_sum[j] += (target[i]/length)
-                gridded_targets_list[j].append(target[i]/length)          
-                gridded_targetsnorm_list[j].append(normtarget[i]*length)          
+# gridded_counts_test = np.zeros(5000)
+# lenlist = []
 
-                gridded_counts[j] += 1
-                lenlist.append(length)
+# #loop through each record     
+# for i in range(len(sitelat)):                         
+#     line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
+#     path=shapely.geometry.LineString(line)
+#     #loop through each grid cell
+#     for j in range(len(df)):
+#         shapely_poly = polygons[j]
+#         if path.intersects(shapely_poly) == True:
+#             shapely_line = shapely.geometry.LineString(line)
+#             intersection_line = list(shapely_poly.intersection(shapely_line).coords)
+#             if len(intersection_line)== 2:
+#                 coords_1 = (intersection_line[0][1], intersection_line[0][0])
+#                 coords_2 = (intersection_line[1][1], intersection_line[1][0])
+#                 length=geopy.distance.distance(coords_1, coords_2).km
 
-#find mean of norm residual
-gridded_targets_list = np.asarray(gridded_targets_list)
-gridded_mean=np.asarray([np.mean(gridded_targets_list[i]) for i in range(len(gridded_targets_list))])
-# gridded_mean=np.asarray([np.median(gridded_targets_list[i]) for i in range(len(gridded_targets_list))])
+#                 gridded_targetsnorm_list_test[j].append(normtarget_test[i]*length)          
 
-#find the cells with no paths (nans)
-nan_ind=np.argwhere(np.isnan(gridded_mean)).flatten()
-# set nan elements for empty array
-# not sureif this isbest orto leaveas a nan
-for i in nan_ind:
-    gridded_mean[i] =0
+#                 gridded_counts_test[j] += 1
+#                 #lenlist.append(length)
+                
+# #find mean of norm residual
+# gridded_targetsnorm_list_test = np.asarray(gridded_targetsnorm_list_test)
+
+# griddednorm_mean_test=np.zeros((len(gridded_targetsnorm_list_test),10))
+# for i in range(len(gridded_targetsnorm_list_test)):
+#     griddednorm_mean_test[i] = np.mean(gridded_targetsnorm_list_test[i],axis=0)
+
+# #find the cells with no paths (nans)
+# nan_ind=np.argwhere(np.isnan(griddednorm_mean_test)).flatten()
+# # set nan elements for empty array
+# # not sureif this isbest orto leaveas a nan
+# for i in nan_ind:
+#     griddednorm_mean_test[i] =0
+
+
+#%%
 
 #find mean of norm residual
 gridded_targetsnorm_list = np.asarray(gridded_targetsnorm_list)
-griddednorm_mean=np.asarray([np.mean(gridded_targetsnorm_list[i]) for i in range(len(gridded_targetsnorm_list))])
+
+griddednorm_mean=np.zeros((len(gridded_targetsnorm_list),10))
+for i in range(len(gridded_targetsnorm_list)):
+    # for j in range(10):
+    griddednorm_mean[i] = np.mean(gridded_targetsnorm_list[i],axis=0)
+
 #find the cells with no paths (nans)
 nan_ind=np.argwhere(np.isnan(griddednorm_mean)).flatten()
 # set nan elements for empty array
@@ -117,34 +172,38 @@ for i in nan_ind:
 
 #add gridded mean and gridded counts to df
 df['counts'] = gridded_counts
-df['meantarget'] = gridded_mean
-df['normtarget'] = griddednorm_mean
-# df['hypoR'] = hypoR
-# df['sitelat']= sitelat
-# df['sitelon'] = sitelon
-# df['evlat'] = evlat
-# df['evlon'] = evlon
+period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 
-# residuals norm
-Z = griddednorm_mean.reshape(len(lat)-1,len(lon)-1)
 
-cbound = max(np.abs(griddednorm_mean))
-cmap = mpl.cm.get_cmap('seismic')
-normalize = mpl.colors.Normalize(vmin=-1*cbound, vmax=cbound)
-colors = [cmap(normalize(value)) for value in Z]
-s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
-s_m.set_array([])
+for i in range(len(griddednorm_mean.T)):
+    T= period[i]
+    g = griddednorm_mean.T[i]
+    Z = g.reshape(len(lat)-1,len(lon)-1)
     
-fig, ax = plt.subplots(figsize = (10,8))
-plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
-plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
-plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
-plt.legend(loc = 'lower left')
+    cbound = max(np.abs(g))
+    cbound = 0.12
 
-fig.subplots_adjust(right=0.75)
-cbar = plt.colorbar(s_m, orientation='vertical')
-cbar.set_label(r'average normalized residual (resid/km)', fontsize = 20)
-plt.show()
+    cmap = mpl.cm.get_cmap('seismic')
+    normalize = mpl.colors.Normalize(vmin=-1*cbound, vmax=cbound)
+    colors = [cmap(normalize(value)) for value in Z]
+    s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
+    s_m.set_array([])
+        
+    fig, ax = plt.subplots(figsize = (10,8))
+    plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
+    plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
+    plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
+    plt.xlim(min(lon),max(lon))
+    plt.ylim(min(lat),max(lat))
+    plt.title('T ' + str(T) + ' s')
+    plt.legend(loc = 'lower left')
+    
+    fig.subplots_adjust(right=0.75)
+    cbar = plt.colorbar(s_m, orientation='vertical')
+    cbar.set_label(r'average normalized residual (resid/km)', fontsize = 20)
+    plt.savefig(folder_path + 'normresid_T_' + str(T) + '.png')
+    plt.show()
+    
 
 # counts
 Z = gridded_counts.reshape(len(lat)-1,len(lon)-1)
@@ -160,43 +219,28 @@ fig, ax = plt.subplots(figsize = (10,8))
 plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
 plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
 plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
+plt.xlim(min(lon),max(lon))
+plt.ylim(min(lat),max(lat))
+plt.title('T ' + str(T) + ' s')
 plt.legend(loc = 'lower left')
 
 fig.subplots_adjust(right=0.75)
 cbar = plt.colorbar(s_m, orientation='vertical')
 cbar.set_label(r'paths per cell', fontsize = 20)
+plt.savefig(folder_path + 'pathcounts.png')
 plt.show()
 
-#histogram colorbar
-# fig.subplots_adjust(right=0.75)
-# cbar_ax = fig.add_axes([0.85, 0.18, 0.1, 0.63])
 
-# plt.ylabel(r'counts per cell', fontsize = 20)
-# plt.xlabel(r'path counts', fontsize = 20)
+#%%
+y_train = griddednorm_mean
 
-# N, bins, patches = cbar_ax.hist(gridded_counts, orientation='horizontal')
-# for bin, patch in zip(bins, patches):
-#     color = cmap(normalize(bin))
-#     patch.set_facecolor(color)
-# plt.show()
-
-
-
-# y_test = test_targets
-y_train = df['normtarget']
-
-x_train = df.drop(['polygon','counts','meantarget','normtarget'], axis=1)
-# x_test = test_data
-
-# x_train_raw = train_data1
-# x_test_raw = test_data1
-
-
+x_test
+x_train = df.drop(['polygon','counts'], axis=1)
 
 transform = Normalizer()
 aa=transform.fit(x_train)
 train_data=aa.transform(x_train)
-# test_data=aa.transform(x_train)
+# test_data=aa.transform(x_test)
 
 batch_size = 264
 
@@ -206,7 +250,7 @@ def build_model():
     # model.add(layers.Dense(10))
 
     #no gP layer
-    model.add(layers.Dense(1))
+    model.add(layers.Dense(10))
 
     model.compile(optimizer=optimizers.Adam(lr=0.01),loss='mse',metrics=['mae','mse']) 
     return model
@@ -222,371 +266,20 @@ mae_history_train=history.history['mae']
 # test_mse_score,test_mae_score,tempp=model.evaluate(x_test,y_test)
 
 pre = model.predict(train_data)
-r = np.asarray(y_train)-pre.flatten()
-
-plt.figure()
-lim = np.max(np.asarray([abs(np.asarray(y_train)), abs(pre.flatten())]).flatten())
-plt.scatter(np.asarray(y_train),pre.flatten())
-plt.xlim(-1*lim, lim)
-plt.ylim(-1*lim, lim)
-
-plt.show()
-
-
-#%%
-
-
-# grid predictions
-Z = pre.reshape(len(lat)-1,len(lon)-1)
-
-cbound = max(np.abs(pre))
-cmap = mpl.cm.get_cmap('seismic')
-normalize = mpl.colors.Normalize(vmin=-1*cbound, vmax=cbound)
-colors = [cmap(normalize(value)) for value in Z]
-s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
-# s_m.set_array([])
-    
-fig = plt.figure(figsize = (10,8))
-plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
-plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
-plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
-plt.legend(loc = 'lower left')
-
-fig.subplots_adjust(right=0.75)
-cbar_ax = fig.add_axes([0.85, 0.18, 0.1, 0.63])
-
-plt.ylabel(r'counts per cell', fontsize = 20)
-plt.xlabel(r'path counts', fontsize = 20)
-
-N, bins, patches = cbar_ax.hist(gridded_counts, orientation='horizontal')
-for bin, patch in zip(bins, patches):
-    color = cmap(normalize(bin))
-    patch.set_facecolor(color)
-plt.show()
-
-
-
-
-
-
-
-
-
-#%%
-
-
-Z = np.random.rand(6, 10)
-x = np.arange(-0.5, 10, 1)  # len = 11
-y = np.arange(4.5, 11, 1)  # len = 7
-
-fig, ax = plt.subplots()
-ax.pcolormesh(x, y, Z)
-    
-    # for j in range(len(polygons)):
-    #     shapely_poly = polygons[j]
-    #     if path.intersects(shapely_poly) == True:
-    #         shapely_line = shapely.geometry.LineString(line)
-    #         intersection_line = list(shapely_poly.intersection(shapely_line).coords)
-    #         if len(intersection_line)== 2:
-    #             print(len(intersection_line))
-    #             coords_1 = (intersection_line[0][1], intersection_line[0][0])
-    #             coords_2 = (intersection_line[1][1], intersection_line[1][0])
-    #             length=geopy.distance.distance(coords_1, coords_2).km
-    #             gridded_targets += (target[i]/length)
-                
-
-    
- 
-    
- 
-polygon_points = [(lon[i], lat[j]), (lon[i], lat[j+1]), (lon[i+1], lat[j+1]), (lon[i+1], lat[j]), (lon[i], lat[j])]
-
- 
-    
- 
-# polygons = 
-# for lati in lat:
-#     for loni in lon:
-#         print(lati, loni)
-#         polygon = [(loni, lati), (loni, lati, (l+dx,ll+dx), (l,ll+dx), (l,ll)]
-
-polygons = [(l,ll), (l+dx,ll), (l+dx,ll+dx), (l,ll+dx), (l,ll)]
-shapely_poly = shapely.geometry.Polygon(polygon)
-
-train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n=6)
-
-sitelat = train_data1[:,1]
-sitelon = train_data1[:,2]
-evlat = train_data1[:,3]
-evlon = train_data1[:,4]
-
-
-
-
-
-
-
-
-
-
-
-
-
-fig, axs  = plt.subplots(5, 5, figsize=(12,12))
-
-
-Mw=[6.5,6.75,7,7.25,7.5]
-Dip=[90,75,60,45,30.5]
-
-      
-irec=-1        
-for iii in Mw:
-    irec=irec+1
-    jrec=-1
-    for jjj in Dip:
-        jrec=jrec+1
-        
-        Mwtrain= dftrain["Mag"]
-        distrain=dftrain["Site_Rupture_Dist"]
-        vs30train=dftrain["vs30"]
-        z10train=dftrain["z10"]
-        z25train=dftrain["z25"]
-        lattrain=dftrain["CS_Site_Lat"]
-        longtrain=dftrain["CS_Site_Lon"]
-        periodtrain=dftrain["siteperiod"]
-        
-        hypolattrain=dftrain["Hypocenter_Lat"]
-        hypolontrain=dftrain["Hypocenter_Lon"]
-        hypodepthtrain=dftrain["Hypocenter_Depth"]
-        raketrain=dftrain["Rake_y"]
-        diptrain=dftrain["Dip_y"]
-        striketrain=dftrain["Strike_y"]+180
-        widthtrain=dftrain["Width"]
-        
-        residtesttemp=dftrain.loc[:, 'IM_Value':'IM175']
-        train_targets=np.log(residtesttemp.values/100)
-        
-        lengthtrain=dftrain["Length"]
-        rjbtrain=dftrain["rjb"]
-        rxtrain=dftrain["rx"]
-        rytrain=dftrain["ry0"]
-        hypodistrain=dftrain["hypodistance"]
-        
-        Utrain=dftrain["U"]
-        Ttrain=dftrain["T"]
-        xitrain=dftrain["xi"]
-
-
-        index=(diptrain<(jjj+10))
-        diptrain=diptrain[index]
-        Mwtrain=Mwtrain[index]
-        distrain=distrain[index]
-        rxtrain=rxtrain[index]
-        rytrain=rytrain[index]
-        lattrain=lattrain[index]
-        longtrain=longtrain[index]
-        hypolontrain=hypolontrain[index]
-        hypolattrain=hypolattrain[index]
-        
-        
-        index=(diptrain>(jjj-10))
-        diptrain=diptrain[index]
-        Mwtrain=Mwtrain[index]
-        distrain=distrain[index]
-        rxtrain=rxtrain[index]
-        rytrain=rytrain[index]
-        lattrain=lattrain[index]
-        longtrain=longtrain[index]
-        hypolontrain=hypolontrain[index]
-        hypolattrain=hypolattrain[index]
-
-        index=(Mwtrain<(iii+0.1))
-        diptrain=diptrain[index]
-        Mwtrain=Mwtrain[index]
-        distrain=distrain[index]
-        rxtrain=rxtrain[index]
-        rytrain=rytrain[index]
-        lattrain=lattrain[index]
-        longtrain=longtrain[index]
-        hypolontrain=hypolontrain[index]
-        hypolattrain=hypolattrain[index]
-        
-        index=(diptrain>(iii-0.1))
-        diptrain=diptrain[index]
-        Mwtrain=Mwtrain[index]
-        distrain=distrain[index]    
-        rxtrain=rxtrain[index]
-        rytrain=rytrain[index]
-        lattrain=lattrain[index]
-        longtrain=longtrain[index]
-        hypolontrain=hypolontrain[index]
-        hypolattrain=hypolattrain[index]        
-       
-        
-        nnn=9600#  +1    
-        
-        temp1=np.zeros([nnn])
-        temp2=np.zeros([nnn])
-        temp3=np.zeros([nnn])
-        temp4=np.zeros([nnn])
-        temp5=np.zeros([nnn])
-        
-        Latt=[]
-        Longg=[]
-        #i3=-1
-        from shapely.geometry import LineString    
-        dx=0.05/2
-        for l in np.arange(-119.5,-116.5,dx):
-            for ll in np.arange(33.25,35.25,dx):
-                Latt.append(ll)
-                Longg.append(l)
-        
-        #for i in dftrain.shape[0]:
-        for i in range(hypolattrain.shape[0]):
-            print(i,iii,jjj)
-            
-            
-            i3=-1
-            
-            #loop through grid
-            for l in np.arange(-119.5,-116.5,dx):
-                for ll in np.arange(33.25,35.25,dx):
-                    #Latt.append(ll)
-                    #Longg.append(l)
-                    i3=i3+1
-                    #print(i3)
-                    
-        #    hypolattrain=dftrain["Hypocenter_Lat"]
-        #hypolontrain=dftrain["Hypocenter_Lon"]
-        #lattrain=dftrain["CS_Site_Lat"]
-        #longtrain=dftrain["CS_Site_Lon"]
-        
-        
-            
-                    polygon = [(l,ll), (l+dx,ll), (l+dx,ll+dx), (l,ll+dx), (l,ll)]
-                    shapely_poly = shapely.geometry.Polygon(polygon)
-        
-                    line = [(hypolontrain.values[i], hypolattrain.values[i]), (longtrain.values[i], lattrain.values[i])]
-        #line = [(3.5, -2.0000000000000004), (2.0, -1.1102230246251565e-15)]
-                    path=shapely.geometry.LineString(line)
-                    if path.intersects(shapely_poly) == True:
-                        temp1[i3]=temp1[i3]+1
-                        
-                        
-                        shapely_line = shapely.geometry.LineString(line)
-                        intersection_line = list(shapely_poly.intersection(shapely_line).coords)
-                        
-                        if len(intersection_line)== 2:
-                            coords_1 = (intersection_line[0][1], intersection_line[0][0])
-                            coords_2 = (intersection_line[1][1], intersection_line[1][0])
-                            length=geopy.distance.vincenty(coords_1, coords_2).km
-                            temp2[i3]=temp2[i3]+length
-                            temp3[i3]=temp3[i3]+b[i,2]/length
-                            temp4[i3]=temp4[i3]+b[i,4]/length
-                            temp5[i3]=temp5[i3]+b[i,7]/length
-                            #print(len(intersection_line))
-                        else:
-                            print(len(intersection_line))
-                            length=0
-                            temp2[i3]=temp2[i3]+length
-                        #print(intersection_line)
-        
-        
-        
-        
-        r=np.array(temp1).reshape(len(Latt),1)
-        from matplotlib  import cm
-        
-
-        #fig = plt.figure(figsize=(12,12))
-        #axs[0].set_title("Shakemap: Ridgecrest: 7.1, Period = 3 s (g)",fontsize=14)
-        axs[irec,jrec].set_title([str(iii),str(jjj)],fontsize=14)
-        axs[irec,jrec].set_xlabel("Ry",fontsize=12)
-        
-        #axs[irec,jrec].set_ylabel("SA (g)",fontsize=12)
-        #axs[irec,jrec].grid(True,linestyle='-',color='0.25')
-       # axs[irec,jrec].semilogy(temp2[0:nnn],(np.exp(gmpeBSSAdata2)+np.exp(gmpeCBdata2)+np.exp(gmpeCYdata2)+np.exp(gmpeASKdata2))/4,label='GMPE Average',color='k')
-
-       # axs[irec,jrec].fill_between(temp2[0:nnn], np.exp(gmpeBSSAdata2), np.exp(gmpeASKdata2),label='GMPE Range',color='lightslategray')
-
-        
-       # axs[irec,jrec].plot(temp2[0:nnn],np.exp(a[:,4])/9.8,label='ANN',color='b')
-        
-        #axs[irec,jrec].plot([longtrain,lattrain],[hypolontrain,hypolattrain])
-        
-        
-        #axs[irec,jrec].legend()
-        #plt.grid()
-        #fig = plt.figure(figsize=(6,6))
-        #axs[irec,jrec] = fig.add_subplot(111)
-        #axs[irec,jrec].set_title("Resolution",fontsize=14)
-        #axs[irec,jrec].set_xlabel("Longitude",fontsize=12)
-        #axs[irec,jrec].set_ylabel("Latitude",fontsize=12)
-        axs[irec,jrec].grid(True,linestyle='-',color='0.75')
-
-
-# scatter with colormap mapping to z value
-        ag=axs[irec,jrec].scatter(np.array(Longg).reshape((len(Latt),1)), np.array(Latt).reshape((len(Latt),1)),s=20,c=r, marker = 'o', cmap = cm.jet );
-        Lat = np.loadtxt('/Users/kwithers/cyberLat.txt')
-        Lon=  np.loadtxt('/Users/kwithers/cyberLon.txt')
-        
-        index=(Lon>(-120))
-        Lon=Lon[index]
-        Lat=Lat[index]
-        
-        axs[irec,jrec].plot(Lon,Lat,'^',markerfacecolor='k',markeredgecolor='k',markersize=0.5)
-
-        #axs[irec,jrec].colorbar(ag)
-        #fig.colorbar(ag, ax=axs[3, 0])
-plt.show()
-        #ax.grid(True,linestyle='-',color='0.25')
-
-
-#plt.grid()
-#ax.grid(True,linestyle='-',color='0.25')        
-#plt.xlabel("Ry",fontsize=12)
-#plt.ylabel("SA (g)",fontsize=12)
-        
-
-
-#plt.plot(ztest[:,10], np.exp(residtest[:,4]),'.',label='Data')
-#add data to slice plots#
-
-
-
-
-r=np.array(temp1).reshape(len(Latt),1)
-from matplotlib  import cm
-
-fig = plt.figure(figsize=(6,6))
-ax = fig.add_subplot(111)
-ax.set_title("Resolution",fontsize=14)
-ax.set_title("Resolution",fontsize=14)
-ax.set_xlabel("Longitude",fontsize=12)
-ax.set_ylabel("Latitude",fontsize=12)
-ax.grid(True,linestyle='-',color='0.75')
-
-
-# scatter with colormap mapping to z value
-ag=ax.scatter(np.array(Longg).reshape((len(Latt),1)), np.array(Latt).reshape((len(Latt),1)),s=20,c=r, marker = 'o', cmap = cm.jet );
-plt.colorbar(ag)
-plt.show()
-
-
-################################
-r=np.array(temp2).reshape(len(Latt),1)
-from matplotlib  import cm
-
-fig = plt.figure(figsize=(6,6))
-ax = fig.add_subplot(111)
-ax.set_title("Resolution 2",fontsize=14)
-ax.set_title("Resolution 2",fontsize=14)
-ax.set_xlabel("Longitude",fontsize=12)
-ax.set_ylabel("Latitude",fontsize=12)
-ax.grid(True,linestyle='-',color='0.75')
-
-
-# scatter with colormap mapping to z value
-ag=ax.scatter(np.array(Longg).reshape((len(Latt),1)), np.array(Latt).reshape((len(Latt),1)),s=20,c=r, marker = 'o', cmap = cm.jet );
-plt.colorbar(ag)
-plt.show()
+# r = np.asarray(y_train)-pre.flatten()
+r = (y_train)-pre
+
+for i in range(10):
+    T= period[i]
+    y = pre.T[i]
+    x = y_train.T[i]
+    plt.figure(figsize = (6,6))
+    lim = np.max(np.asarray([abs(x), abs(y)]).flatten())
+    plt.scatter(x,y,s=1)
+    plt.xlabel('observed')
+    plt.xlabel('predicted')
+    plt.title('T ' + str(T) + ' s')
+    plt.xlim(-1*lim, lim)
+    plt.ylim(-1*lim, lim)
+    plt.savefig(folder_path + 'obs_pre_T_' + str(T) + '.png')
+    plt.show()

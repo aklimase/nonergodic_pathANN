@@ -63,7 +63,6 @@ x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_
 
 #12 feature ANN
 def build_model():
-    #model=models.Sequential()
     model = Sequential()
     model.add(layers.Dense(x_train.shape[1],activation='sigmoid', input_shape=(x_train.shape[1],)))
 
@@ -173,12 +172,6 @@ if not os.path.exists(folder_path):
 train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n=4)
 x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw  = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path)
 
-
-
-
-
-
-
 def build_model():
     #model=models.Sequential()
     model = Sequential()
@@ -237,16 +230,6 @@ predict_epistemic_train_allT = np.std(predict_mean_train2, axis = 0)
 period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 
 ##################
-# target1_resid = (resid_train - mean_x_train_all) + 
-# target2 = resid_test
-
-target2_residual = resid_test - mean_x_test_allT
-target1_residual = 
-
-# target1_residual = resid_test +
-# target2_residual + mean_x_test_allT
-# 
-
 
 diff=np.std(resid_train - mean_x_train_allT,axis=0)
 difftest=np.std(resid_test-mean_x_test_allT,axis=0)
@@ -366,39 +349,5 @@ class RBFKernelFn_opt(tf.keras.layers.Layer):
       # length_scale=tf.nn.softplus([1.0,1.0,1.0,1.0,1.0] * self._length_scale), feature_ndims=5
       amplitude=(tf.nn.softplus(amplitude_opt* self._amplitude)),
       length_scale=(tf.nn.softplus(length_scale_opt* self._length_scale)))
-#%%
-
-
-
-
-Q = 10 # nr of terms in the sum
-max_iters = 1000
-D = len(y_train[0])
-def create_model(hypers):
-    f = np.clip(hypers[:Q], 0, 5)
-    weights = np.ones(Q) / Q
-    lengths = hypers[Q:]
-
-    kterms = []
-    for i in range(Q):
-        # rbf = gpflow.kernels.RBF(D, lengthscales=lengths[i], variance=1./Q)
-        mat =  tfp.math.psd_kernels.MaternOneHalf(feature_ndims=D, amplitude=1./Q, length_scale=lengths[i])
-        transformation_fn=lambda x, _: tf.exp(x)
-        # rbf.lengthscales.transform = gpflow.transforms.Exp()
-        mat = tfp.math.psd_kernels.FeatureTransformed(mat, transformation_fn, validate_args=False, parameters=None,name='FeatureTransformed')
-        
-        cos = tfp.math.psd_kernels.Linear(feature_ndims=D, bias_variance=None, slope_variance=None)
-        transformation_fn=lambda x, _: tf.cos(x)
-        cos = tfp.math.psd_kernels.FeatureTransformed(cos, transformation_fn, validate_args=False, parameters=None,name='FeatureTransformed')
-
-        kterms.append(mat * cos)
-
-    k = np.sum(kterms) + tfp.math.psd_kernels.Linear(D) #+ gpflow.kernels.Bias(D)
-    # m = gpflow.gpr.GPR(X_train, Y_train, kern=k)
-    return k
-
-k = create_model(np.ones((2*Q,)))
-
-
 
 
