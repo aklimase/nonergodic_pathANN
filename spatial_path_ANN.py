@@ -6,10 +6,13 @@ Created on Thu Jul  9 18:03:06 2020
 @author: aklimasewski
 
 ANN with only lat,lon of station and event trained on residuals
+
+includes kernel class and optimization
 """
-
-
-
+import sys
+import os
+sys.path.append(os.path.abspath('/Users/aklimasewski/Documents/nonergodic_ANN'))
+from preprocessing import transform_dip, readindata, transform_data
 from pprint import pprint
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,15 +44,9 @@ sns.set_style('whitegrid')
 sns.set_context('talk')
 sns.set_context(context='talk',font_scale=0.7)
 
-
-
 tfd = tfp.distributions
-
 tfb = tfp.bijectors
 tfk = tfp.math.psd_kernels
-
-
-###############
 
 #%%
 
@@ -63,176 +60,15 @@ epochs = 15
 n = 12
 #or n = 6, 4
 
-# %%
-def transform_dip(diptrain,diptest,rxtrain,rxtest):
-    for i in range(len(diptrain)):
-        if diptrain[i]>30:
-            rxtrain[i]=rxtrain[i]*(90-diptrain[i])/45
-        else:
-            rxtrain[i]=rxtrain[i]*60/45
-            
-    for i in range(len(diptest)): 
-        if diptest[i]>30:
-            rxtest[i]=rxtest[i]*(90-diptest[i])/45
-        else:
-            rxtest[i]=rxtest[i]*60/45    
-    #return the transformed arrays
-    return diptrain, diptest, rxtrain, rxtest
 
-
-def readindata(nametrain, nametest, n):
-#Read in datasets
-# nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv'
-# nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv'
-    
-    dftrain = pd.read_pickle(nametrain) 
-    dftest = pd.read_pickle(nametest)
-    print(dftrain.shape)
-    print(dftest.shape)
-    
-    
-    #separate dataframe to pandas series (1 col of df)
-    Mwtrain= dftrain["Mag"]
-    distrain=dftrain["Site_Rupture_Dist"]
-    vs30train=np.array(dftrain["vs30"])
-    z10train=dftrain["z10"]
-    z25train=dftrain["z25"]
-    lattrain=dftrain["CS_Site_Lat"]
-    longtrain=dftrain["CS_Site_Lon"]
-    periodtrain=dftrain["siteperiod"]
-    hypolattrain=dftrain["Hypocenter_Lat"]
-    hypolontrain=dftrain["Hypocenter_Lon"]
-    hypodepthtrain=dftrain["Hypocenter_Depth"]
-    raketrain=dftrain["Rake_y"]
-    diptrain=dftrain["Dip_y"]
-    striketrain=dftrain["Strike_y"]+180
-    widthtrain=dftrain["Width"]
-    #Outputs (col per period)
-    residtesttemp=dftrain.loc[:, 'IM_Value':'IM175']
-    train_targets1=residtesttemp.values
-    
-    #histogram of output (1 period of IM175)
-    plt.hist(train_targets1[:,3],100)
-    
-    lengthtrain=dftrain["Length"]
-    rjbtrain=dftrain["rjb"]
-    rxtrain=dftrain["rx"]
-    rytrain=dftrain["ry"]
-    hypodistrain=dftrain["hypodistance"]
-    Utrain=dftrain["U"]
-    Ttrain=dftrain["T"]
-    xitrain=dftrain["xi"]
-    startdepthtrain=dftrain["Start_Depth"]
-    
-    
-    #### same with testdata
-    Mwtest= dftest["Mag"]
-    distest=dftest["Site_Rupture_Dist"]
-    vs30test=np.array(dftest["vs30"])
-    z10test=dftest["z10"]
-    z25test=dftest["z25"]
-    lattest=dftest["CS_Site_Lat"]
-    longtest=dftest["CS_Site_Lon"]
-    periodtest=dftest["siteperiod"]
-    hypolattest=dftest["Hypocenter_Lat"]
-    hypolontest=dftest["Hypocenter_Lon"]
-    hypodepthtest=dftest["Hypocenter_Depth"]
-    raketest=dftest["Rake_y"]
-    diptest=dftest["Dip_y"]
-    striketest=dftest["Strike_y"]+180
-    widthtest=dftest["Width"]
-    residtesttemp1=dftest.loc[:, 'IM_Value':'IM175']
-    test_targets1=residtesttemp1.values
-    lengthtest=dftest["Length"]
-    rjbtest=dftest["rjb"]
-    rxtest=dftest["rx"]
-    rytest=dftest["ry"]
-    hypodistest=dftest["hypodistance"]
-    Utest=dftest["U"]
-    Ttest=dftest["T"]
-    xitest=dftest["xi"]
-    startdepthtest=dftest["Start_Depth"]
-    
-    diptrain, diptest, rxtrain, rxtest = transform_dip(diptrain=np.array(diptrain),diptest=np.array(diptest),rxtrain=np.array(rxtrain),rxtest=np.array(rxtest))
-    
-    #put together arrays of features for ANN
-    #starting with just lat,lon of station and event    
-    
-    if n == 6:
-        train_data1 = np.column_stack([hypodistrain, lattrain, longtrain, hypolattrain, hypolontrain, hypodepthtrain])
-        test_data1 = np.column_stack([hypodistest, lattest, longtest, hypolattest, hypolontest, hypodepthtest])
-        feature_names=np.asarray(['hypoR','stlat', 'stlon', 'hypolat','hypolon', 'hypodepth'])
-    
-    
-    else: #12
-        train_data1 = np.column_stack([Mwtrain,distrain,vs30train,z10train,z25train,raketrain,diptrain,hypodepthtrain, widthtrain,
-                                rjbtrain,rxtrain,startdepthtrain])
-        test_data1 = np.column_stack([Mwtest,distest,vs30test,z10test,z25test,raketest,diptest, hypodepthtest, widthtest,
-                              rjbtest,rxtest,startdepthtest])
-
-        feature_names=np.asarray(['Mw','Rrup','Vs30', 'Z1.0', 'Z2.5', 'Rake','Dip','Hypo_depth', 'Width',
-                'Rjb','Rx','Ztor',])
-
-
-    return train_data1, test_data1, train_targets1, test_targets1, feature_names
-
-
-
-train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = n)
-
-#%%
-
-#normalize data
-#preprocessing transform inputs data to be guassian shaped
-# pt = PowerTransformer()
-# aa=pt.fit(train_data1[:,:])
-# train_data=aa.transform(train_data1)
-# test_data=aa.transform(test_data1)
-
-def transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path):
-
-    transform = transform_method
-    aa=transform.fit(train_data1[:,:])
-    train_data=aa.transform(train_data1)
-    test_data=aa.transform(test_data1)
-    
-    #plot transformed features
-    for i in range(len(train_data[0])):
-        plt.figure(figsize =(8,8))
-        plt.title('transformed feature: ' + str(feature_names[i]))
-        plt.hist(train_data[:,i])
-        plt.savefig(folder_path + 'histo_transformedfeature_' + str(feature_names[i]) + '.png')
-        plt.show()
-    
-    train_targets = train_targets1
-    test_targets = test_targets1
-    
-    y_test = test_targets
-    y_train = train_targets
-    
-    x_train = train_data
-    x_test = test_data
-    
-    x_train_raw = train_data1
-    x_test_raw = test_data1
-    
-    x_range = [[min(train_data.T[i]) for i in range(len(train_data[0]))],[max(train_data.T[i]) for i in range(len(train_data[0]))]]
-    
-    # Rindex = np.where(feature_names == 'hypoR')[0][0]
-
-    return(x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw)
-
-
-
+train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/USGS/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/USGS/data/cybertestyeti10_residfeb.csv', n = n)
 
 x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path)
-# x_train = train_data[rand_ind_train]
-
 
 #%%
 
 # create sequential model with positional inputs and predict 
-#try sequential with VGP layer
+# try sequential with VGP layer
 # For numeric stability, set the default floating-point dtype to float64
 
 batch_size = 264
@@ -264,9 +100,7 @@ def build_model():
     #model.compile(optimizer='adam',loss='mse',metrics=['mae']) 
     return model
 
-
 model=build_model()
-
 
 #fit the model
 history=model.fit(x_train,y_train,validation_data=(x_test,y_test),epochs=epochs,batch_size=batch_size,verbose=1)
@@ -277,13 +111,6 @@ test_mse_score,test_mae_score,tempp=model.evaluate(x_test,y_test)
 #dataframe for saving purposes
 hist_df = pd.DataFrame(history.history)
 
-
-#plotting
-
-# folder_path = '/Users/aklimasewski/Documents/pathresid_ANN_GPlayer_opt_kernel_fulldata/'
-# folder_path = '/Users/aklimasewski/Documents/pathresid_ANN_noGPlayer_10000_randsamples/'
-# folder_path = '/Users/aklimasewski/Documents/pathresid_ANN_noGPlayer_norm/'
-# 
 f10=plt.figure('Overfitting Test')
 plt.plot(mae_history,label='Testing Data')
 plt.plot(mae_history_train,label='Training Data')
@@ -295,8 +122,6 @@ print(test_mae_score)
 plt.grid()
 plt.savefig(folder_path + 'error.png')
 plt.show()
-
-
 
 predict_mean = []
 predict_epistemic = []
@@ -351,10 +176,6 @@ plt.legend()
 plt.savefig(folder_path + 'mean_T.png')
 plt.show()
 
-
-
-
-
 #write model details to a file
 file = open(folder_path + 'model_details.txt',"w+")
 file.write('number training samples ' + str(len(x_train)) + '\n')
@@ -390,7 +211,6 @@ for j in range(0,3):#len(period)):
     
     if not os.path.exists(folder_path + folderlist[j]):
         os.makedirs(folder_path + folderlist[j])
-    
     
     #each column is prediction for a period
      
@@ -444,20 +264,7 @@ for j in range(0,3):#len(period)):
     plt.legend(loc = 'upper left')
     plt.savefig(folder_path + folderlist[j] + '/norm_dist_vs_actual.png')
     plt.show()
-    
-    # f1=plt.figure('Mag normalized Actual')
-    # plt.plot(x_train[:,Mindex],y_train[:,y_ind],'.r')
-    # plt.plot(x_test[:,Mindex],y_test[:,y_ind],'.b')
-    # # plt.plot(x_train[:,1],y_train[:,y_ind],'.r')
-    # # plt.plot(x_test[:,1],y_test[:,y_ind],'.b')
-    # plt.xlabel('input normalized mag')
-    # plt.ylabel('target')
-    # plt.title('Earthquake Magnitude normalized Actual')
-    # plt.savefig(folder_path + folderlist[j] + '/norm_mag_vs_actual.png')
-    # plt.show()
-    
-    
-    
+
     #title = 'T = 5.0 s'
     # f212, ax=plt.figure()
     f212, ax = plt.subplots(1,1,figsize=(8,8))
@@ -478,10 +285,6 @@ for j in range(0,3):#len(period)):
     plt.savefig(folder_path + folderlist[j] + '/Histo.png')
     plt.show()
     
-
-    
-
-
 
 
 #%%
@@ -556,7 +359,7 @@ def Optimize_kernelparams(train_data1):
     
     return amplitude_opt,length_scale_opt
 
-# amplitude_opt,length_scale_opt = Optimize_kernelparams(train_data1)
+amplitude_opt,length_scale_opt = Optimize_kernelparams(train_data1)
 
 class RBFKernelFn_opt(tf.keras.layers.Layer):
   def __init__(self, **kwargs):
@@ -586,130 +389,6 @@ class RBFKernelFn_opt(tf.keras.layers.Layer):
       # length_scale=tf.nn.softplus([1.0,1.0,1.0,1.0,1.0] * self._length_scale), feature_ndims=5
       amplitude=(tf.nn.softplus(amplitude_opt* self._amplitude)),
       length_scale=(tf.nn.softplus(length_scale_opt* self._length_scale)))
-
-
-#%%o
-
-
-
-
-# tf.keras.backend.set_floatx('float64')
-# batch_size = 10
-# num_inducing_points = 10
-# loss = lambda y, rv_y: rv_y.variational_loss(
-#     y, kl_weight=np.array(batch_size) / train_data.shape[0])
-
-
-# def build_model():
-#     #model=models.Sequential()
-#     model = Sequential()
-#     model.add(layers.Dense(x_train.shape[1],activation='sigmoid', input_shape=(x_train.shape[1],)))
-
-#     #no gP layer
-#     # model.add(layers.Dense(train_targets.shape[1]))
-#     model.add(tfp.layers.VariationalGaussianProcess(
-#         num_inducing_points=num_inducing_points,
-#         kernel_provider=RBFKernelFn_opt(),
-#         # kernel_provider=TestKernelFn(),
-#         # kernel=optimized_kernel,
-#         event_shape=[y_train.shape[1]],#outputshape
-#         inducing_index_points_initializer=tf.constant_initializer(y_train.shape[1]*[np.linspace(*x_range,num_inducing_points,dtype='float64')]),
-#         unconstrained_observation_noise_variance_initializer=(
-#             tf.constant_initializer(0.1))))
-
-#     model.compile(optimizer=optimizers.Adam(lr=0.01),loss='mse',metrics=['mae','mse']) 
-#     #model.compile(optimizer='adam',loss='mse',metrics=['mae']) 
-#     return model
-
-
-# model=build_model()
-
-
-# #fit the model
-# history=model.fit(x_train,y_train,validation_data=(x_test,y_test),epochs=15,batch_size=batch_size,verbose=1)
-
-
-# # # Create the trainable variables in our model. Constrain to be strictly
-# # # positive by wrapping in softplus and adding a little nudge away from zero.
-# # amplitude = (np.finfo(np.float64).tiny +
-# #              tf.nn.softplus(
-# #                  tf.Variable(10. * tf.ones(2, dtype=tf.float64)),
-# #                  name='amplitude'))
-# # length_scale = (np.finfo(np.float64).tiny +
-# #                 tf.nn.softplus(
-# #                     tf.Variable([300., 30.], dtype=np.float64),
-# #                     name='length_scale'))
-
-# #%%
-
-# #test kernel class
-# class TestKernelFn(tf.keras.layers.Layer):
-#   def __init__(self, **kwargs):
-#     super(TestKernelFn, self).__init__(**kwargs)
-#     dtype = kwargs.get('dtype', None)
-
-#     self._amplitude = self.add_variable(
-#             initializer=tf.constant_initializer(0),
-#             dtype=dtype,
-#             name='amplitude')
-    
-#     self._length_scale = self.add_variable(
-#             initializer=tf.constant_initializer(0),
-#             dtype=dtype,
-#             name='length_scale')
-
-#   def call(self, x):
-#     # Never called -- this is just a layer so it can hold variables
-#     # in a way Keras understands.
-#     return x
-
-#   @property
-#   def kernel(self):
-          
-#     eq_indices = [0, 2, 4]
-#     periodic_indices = [1, 3,5]
-#     eq_kernel = tfp.math.psd_kernels.FeatureTransformed(
-#         # tfp.math.psd_kernels.MaternOneHalf(amplitude=tf.constant([0.1 * self._amplitude, 0.1 * self._amplitude, 0.1 * self._amplitude]),
-#         tfp.math.psd_kernels.MaternOneHalf(amplitude=tf.constant([2.0, 3.0, 4.0]),
-#         length_scale=tf.constant([1.,1.,1.])),
-
-#         # length_scale=tf.constant([5. * self._length_scale, 5. * self._length_scale, 5. * self._length_scale])),
-#         # transformation_fn=lambda x: tf.gather(x, eq_indices, axis=-1))
-#         transformation_fn=lambda x, _: tf.gather(x, eq_indices, axis=-1))
-#     periodic_kernel = tfp.math.psd_kernels.FeatureTransformed(
-#         tfp.math.psd_kernels.Linear(),
-#         # transformation_fn=lambda x: tf.gather(x, periodic_indices, axis=-1))
-#         transformation_fn=lambda x, _: tf.gather(x, periodic_indices, axis=-1))
-#     kernel = eq_kernel + periodic_kernel
-
-
-#     return kernel
-
-
-
-# eq_indices = [0, 2, 4]
-# periodic_indices = [1, 3]
-# eq_kernel = tfp.math.psd_kernels.FeatureTransformed(
-#     tfp.math.psd_kernels.MaternOneHalf(amplitude=tf.constant([2.0, 3.0, 4.0]),
-#       length_scale=tf.constant([2.0, 3.0, 4.0])),
-#     # transformation_fn=lambda x: tf.gather(x, eq_indices, axis=-1))
-#     transformation_fn=lambda x, _: tf.gather(x, eq_indices, axis=-1))
-# periodic_kernel = tfp.math.psd_kernels.FeatureTransformed(
-#     tfp.math.psd_kernels.Linear(),
-#     # transformation_fn=lambda x: tf.gather(x, periodic_indices, axis=-1))
-#     transformation_fn=lambda x, _: tf.gather(x, periodic_indices, axis=-1))
-# kernel = eq_kernel + periodic_kernel
-
-
-
-
-
-
-
-
-
-
-
 
 
 

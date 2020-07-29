@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jul 20 13:19:45 2020
+Created on Tue Jul 28 16:38:58 2020
 
-@author: aklimasewski
+@author: aklimase
 
-
-build a model that takes cybershake data, input to 12 feature ANN,input those residuals to a spatial ANN
-
-use spatial kernel in second model
+2 ANNs, first 12 feature model, second gridded target residuals
 """
 import sys
 import os
 sys.path.append(os.path.abspath('/Users/aklimasewski/Documents/nonergodic_ANN'))
-from preprocessing import transform_dip, readindata, transform_data
+from preprocessing import transform_dip, readindata, transform_data, create_grid, grid_data
 
-from preprocessing import transform_dip, readindata, transform_data
 from pprint import pprint
 import matplotlib.pyplot as plt
 import numpy as np
@@ -113,7 +109,7 @@ predict_mean= p
 p = np.array(model.predict(x_train))
 predict_mean_train = p
 
-#test data
+   #test data
 mean_x_test_allT = np.mean(predict_mean, axis = 0)
 predict_epistemic_allT = np.std(predict_mean, axis = 0)
 
@@ -162,85 +158,94 @@ file.write('stddev train' + str(diff) + '\n')
 file.write('stddev test' + str(difftest) + '\n')
 file.close()
 
-#new targets
-#predictions
-resid_test = predict_mean
-resid_train  = predict_mean_train
-
-#residuals
-resid_test = y_test-mean_x_test_allT
-resid_train = y_train-mean_x_train_allT
 #%%
-transform_method =  StandardScaler()
-epochs = 15
-batch_size = 264
-folder_path = topdir + 'models/2step_ANN/model4_residuals/'
+folder_path = topdir + 'models/2step_ANN/modelgriddedresiduals/'
 if not os.path.exists(folder_path):
     os.makedirs(folder_path)
+#new targets
+resid_test = y_test-mean_x_test_allT
+resid_train = y_train-mean_x_train_allT
 
+df, lon, lat = create_grid(dx = 0.5)
+nsamples = len(x_train)
+hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts = grid_data(train_data1, train_targets1 = resid_train, df=df, nsamples = nsamples)     
+hypoR_test, sitelat_test, sitelon_test, evlat_test, evlon_test, target_test, gridded_targetsnorm_list_test, gridded_counts_test = grid_data(test_data1, train_targets1 = resid_test, df=df, nsamples = nsamples)                 
+#%%
 
-train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain=topdir + 'data/cybertrainyeti10_residfeb.csv', nametest=topdir + 'data/cybertestyeti10_residfeb.csv', n=4)
-#redefine targets
-x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw  = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path)
+#find mean of norm residual
+gridded_targetsnorm_list = np.asarray(gridded_targetsnorm_list)
+
+griddednorm_mean=np.zeros((len(gridded_targetsnorm_list),10))
+for i in range(len(gridded_targetsnorm_list)):
+    # for j in range(10):
+    griddednorm_mean[i] = np.mean(gridded_targetsnorm_list[i],axis=0)
+
+#find the cells with no paths (nans)
+nan_ind=np.argwhere(np.isnan(griddednorm_mean)).flatten()
+# set nan elements for empty array
+for i in nan_ind:
+    griddednorm_mean[i] = 0
+    
+#find mean of norm residual
+gridded_targetsnorm_list_test = np.asarray(gridded_targetsnorm_list_test)
+
+griddednorm_mean_test=np.zeros((len(gridded_targetsnorm_list_test),10))
+for i in range(len(gridded_targetsnorm_list_test)):
+    # for j in range(10):
+    griddednorm_mean_test[i] = np.mean(gridded_targetsnorm_list_test[i],axis=0)
+
+#find the cells with no paths (nans)
+nan_ind=np.argwhere(np.isnan(griddednorm_mean_test)).flatten()
+# set nan elements for empty array
+for i in nan_ind:
+    griddednorm_mean_test[i] = 0
+
+y_train = griddednorm_mean
+y_test = griddednorm_mean_test
+
+# x_test
+x_train = df.drop(['polygon','counts'], axis=1)
+
+transform = Normalizer()
+aa=transform.fit(x_train)
+train_data=aa.transform(x_train)
+# test_data=aa.transform(x_test)
+
+batch_size = 264
 
 def build_model():
-    #model=models.Sequential()
     model = Sequential()
-    model.add(layers.Dense(x_train.shape[1],activation='sigmoid', input_shape=(x_train.shape[1],)))
+    model.add(layers.Dense(train_data.shape[1],activation='sigmoid', input_shape=(train_data.shape[1],)))
+    # model.add(layers.Dense(10))
     # model.add(RBFLayer(10, 2))
 
     #no gP layer
-    model.add(layers.Dense(resid_train.shape[1]))
+    model.add(layers.Dense(10))
 
     model.compile(optimizer=optimizers.Adam(lr=0.01),loss='mse',metrics=['mae','mse']) 
-    #model.compile(optimizer='adam',loss='mse',metrics=['mae']) 
     return model
+
 
 model=build_model()
 
 #fit the model
-history=model.fit(x_train,resid_train,validation_data=(x_test,resid_test),epochs=epochs,batch_size=batch_size,verbose=1)
+history=model.fit(train_data,y_train,epochs=10,batch_size=batch_size,verbose=1)
 
-mae_history=history.history['val_mae']
+# mae_history=history.history['val_mae']
 mae_history_train=history.history['mae']
-test_mse_score,test_mae_score,tempp=model.evaluate(x_test,resid_test)
-#dataframe for saving purposes
-hist_df = pd.DataFrame(history.history)
+# test_mse_score,test_mae_score,tempp=model.evaluate(x_test,y_test)
 
-f10=plt.figure('Overfitting Test')
-plt.plot(mae_history,label='Testing Data')
-plt.plot(mae_history_train,label='Training Data')
-plt.xlabel('Epoch')
-plt.ylabel('Mean Absolute Error')
-plt.title('Overfitting Test')
-plt.legend()
-print(test_mae_score)
-plt.grid()
-plt.savefig(folder_path + 'error_2.png')
-plt.show()
-
-
-p = np.array(model.predict(x_test))
-predict_mean2= p
-    
-p = np.array(model.predict(x_train))
-predict_mean_train2 = p
-
-#test data
-mean_x_test_allT = np.mean(predict_mean2, axis = 0)
-predict_epistemic_allT = np.std(predict_mean2, axis = 0)
-
-#training data
-mean_x_train_allT = np.mean(predict_mean_train2, axis = 0)
-predict_epistemic_train_allT = np.std(predict_mean_train2, axis = 0)
+pre = model.predict(train_data)
+r = (y_train)-pre
+pre_test = model.predict(test_data)
+r_test = (y_test)-pre
 
 period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 
 ##################
 
-diff=np.std(resid_train - mean_x_train_allT,axis=0)
-difftest=np.std(resid_test-mean_x_test_allT,axis=0)
-# diffmean=np.mean(y_train-mean_x_train_allT,axis=0)
+diff=np.std(r,axis=0)
+difftest=np.mean(r_test,axis=0)
 f22=plt.figure('Difference Std of residuals vs Period')
 plt.semilogx(period,diff,label='Training ')
 plt.semilogx(period,difftest,label='Testing')
@@ -250,10 +255,10 @@ plt.legend()
 plt.savefig(folder_path + 'resid_T.png')
 plt.show()
 
-diffmean=np.mean(resid_train-mean_x_train_allT,axis=0)
-diffmeantest=np.mean(resid_test-mean_x_test_allT,axis=0)
+diffmean=np.mean(r,axis=0)
+diffmeantest=np.mean(r_test,axis=0)
 f22=plt.figure('Difference Std of residuals vs Period')
-plt.semilogx(period,diffmean,label='Training ')
+plt.semilogx(period,diffmean,label='Training')
 plt.semilogx(period,diffmeantest,label='Testing')
 plt.xlabel('Period')
 plt.ylabel('Mean residual')
@@ -261,50 +266,23 @@ plt.legend()
 plt.savefig(folder_path + 'mean_T.png')
 plt.show()
 
-#write model details to a file
-file = open(folder_path + 'model_details.txt',"w+")
-file.write('number training samples ' + str(len(x_train)) + '\n')
-file.write('number testing samples ' + str(len(x_test)) + '\n')
-file.write('data transformation method ' + str(transform_method) + '\n')
-file.write('input feature names ' +  str(feature_names)+ '\n')
-file.write('number of epochs ' +  str(epochs)+ '\n')
-# file.write('number kernel optimization samples ' + str(num_kernelopt_samples) + '\n')
-# file.write('kernel name ' + str(kernel.name) + '\n')
-# file.write('kernel trainable params ' + str(gp.trainable_variables) + '\n')
-model.summary(print_fn=lambda x: file.write(x + '\n'))
-file.write('model fit history' + str(hist_df.to_string) + '\n')
-file.write('stddev train' + str(diff) + '\n')
-file.write('stddev test' + str(difftest) + '\n')
-file.close()
+for i in range(10):
+    T= period[i]
+    y = pre.T[i]
+    x = y_train.T[i]
+    y_test = pre_test.T[i]
+    x_test = y_test.T[i]
+    plt.figure(figsize = (6,6))
+    lim = np.max(np.asarray([abs(x), abs(y)]).flatten())
+    plt.scatter(x,y,s=1,label='Training')
+    plt.scatter(x_test,y_test,s=1,label='Testing')
+    plt.xlabel('observed')
+    plt.ylabel('predicted')
+    plt.title('T ' + str(T) + ' s')
+    plt.xlim(-1*lim, lim)
+    plt.ylim(-1*lim, lim)
+    plt.savefig(folder_path + 'obs_pre_T_' + str(T) + '.png')
+    plt.show()
 
+###next use grided predictions to add back to original targets
 
-
-
-#%%
-from keras.layers import Layer
-from keras import backend as K
-
-class RBFLayer(Layer):
-
-    def __init__(self, units, gamma, **kwargs):
-        super(RBFLayer, self).__init__(**kwargs)
-        self.units = units
-        self.gamma = K.cast_to_floatx(gamma)
-
-    def build(self, input_shape):
-#         print(input_shape)
-#         print(self.units)
-        self.mu = self.add_weight(name='mu',
-                                  shape=(int(input_shape[1]), self.units),
-                                  initializer='uniform',
-                                  trainable=True)
-        super(RBFLayer, self).build(input_shape)
-
-    def call(self, inputs):
-        diff = K.expand_dims(inputs) - self.mu
-        l2 = K.sum(K.pow(diff, 2), axis=1)
-        res = K.exp(-1 * self.gamma * l2)
-        return res
-
-    def compute_output_shape(self, input_shape):
-        return (input_shape[0], self.units)

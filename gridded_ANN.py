@@ -5,6 +5,10 @@ Created on Mon Jul 20 16:38:02 2020
 
 @author: aklimasewski
 """
+import sys
+import os
+sys.path.append(os.path.abspath('/Users/aklimasewski/Documents/nonergodic_ANN'))
+from preprocessing import transform_dip, readindata, transform_data, create_grid, grid_data
 
 import shapely
 import shapely.geometry
@@ -29,129 +33,15 @@ tf.enable_v2_behavior()
 from keras import layers
 from keras import optimizers
 
-folder_path = '/Users/aklimasewski/Documents/gridded_ANN/10Tgrid_rand20000/'
+folder_path = '/Users/aklimase/Documents/USGS/models/gridded_ANN/model12/'
 
-nsamples = 5000
+nsamples = 500
 
-def create_grid(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.1):
-    dx=0.1
-    lon = np.arange(-121,-115.5, dx)
-    lat = np.arange(32, 37.5, dx)
-    
-    latmid = []
-    lonmid = []
-    polygons = []
-    for i in range(len(lon)-1):
-        for j in range(len(lat)-1):
-            polygon_points = [(lon[i], lat[j]), (lon[i], lat[j+1]), (lon[i+1], lat[j+1]), (lon[i+1], lat[j]), (lon[i], lat[j])]
-            shapely_poly = shapely.geometry.Polygon(polygon_points)
-            polygons.append(shapely_poly)
-            latmid.append((lat[j]+lat[j+1])/2.)
-            lonmid.append((lon[i]+lon[i+1])/2.)
-               
-    d = {'polygon': polygons, 'latmid': latmid, 'lonmid': lonmid}
-    df = pd.DataFrame(data=d)    
-    return df
-    
-#choose random subset for fast testing
-def grid_data(train_data1, train_targets1, df, nsamples = 5000):
-    randindex = random.sample(range(0, len(train_data1)), nsamples)
-    
-    hypoR = train_data1[:,0][randindex]
-    sitelat = train_data1[:,1][randindex]
-    sitelon = train_data1[:,2][randindex]
-    evlat = train_data1[:,3][randindex]
-    evlon = train_data1[:,4][randindex]
-    target = train_targets1[:][randindex]
-    
-    normtarget = target / hypoR[:, np.newaxis]
-    gridded_targetsnorm_list = [ [] for _ in range(df.shape[0]) ]
-    
-    gridded_counts = np.zeros(df.shape[0])
-    lenlist = []
-    
-    #loop through each record     
-    for i in range(len(sitelat)):                         
-        line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
-        path=shapely.geometry.LineString(line)
-        #loop through each grid cell
-        for j in range(len(df)):
-            shapely_poly = df['polygon'][j]
-            if path.intersects(shapely_poly) == True:
-                shapely_line = shapely.geometry.LineString(line)
-                intersection_line = list(shapely_poly.intersection(shapely_line).coords)
-                if len(intersection_line)== 2:
-                    coords_1 = (intersection_line[0][1], intersection_line[0][0])
-                    coords_2 = (intersection_line[1][1], intersection_line[1][0])
-                    length=geopy.distance.distance(coords_1, coords_2).km
-                    gridded_targetsnorm_list[j].append(normtarget[i]*length)          
-                    gridded_counts[j] += 1
-                    lenlist.append(length)
-                
-        return hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts
-    
-    
-train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n=6)
+train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimase/Documents/USGS/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimase/Documents/USGS/data/cybertestyeti10_residfeb.csv', n=6)
 #start with defaults
-df = create_grid()
+df, lon, lat = create_grid(dx = 0.5)
 
-hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts = grid_data(train_data1, train_targets1, df, nsamples = 5000)           
-#%%
-# #test data
-# randindex = random.sample(range(0, len(test_data1)), 5000)
-
-# hypoR = test_data1[:,0][randindex]
-# sitelat = test_data1[:,1][randindex]
-# sitelon = test_data1[:,2][randindex]
-# evlat = test_data1[:,3][randindex]
-# evlon = test_data1[:,4][randindex]
-# # target = train_targets1[:,5][randindex]
-# target_test = test_targets1[:][randindex]
-
-# # normtarget = target/hypoR
-# normtarget_test = target_test / hypoR[:, np.newaxis]
-# # gridded_targets_sum = np.zeros(df.shape[0])
-# gridded_targetsnorm_list_test = [ [] for _ in range(5000) ]
-# # gridded_targets_list = [ np.ones(10) for _ in range(df.shape[0]) ]
-
-# gridded_counts_test = np.zeros(5000)
-# lenlist = []
-
-# #loop through each record     
-# for i in range(len(sitelat)):                         
-#     line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
-#     path=shapely.geometry.LineString(line)
-#     #loop through each grid cell
-#     for j in range(len(df)):
-#         shapely_poly = polygons[j]
-#         if path.intersects(shapely_poly) == True:
-#             shapely_line = shapely.geometry.LineString(line)
-#             intersection_line = list(shapely_poly.intersection(shapely_line).coords)
-#             if len(intersection_line)== 2:
-#                 coords_1 = (intersection_line[0][1], intersection_line[0][0])
-#                 coords_2 = (intersection_line[1][1], intersection_line[1][0])
-#                 length=geopy.distance.distance(coords_1, coords_2).km
-
-#                 gridded_targetsnorm_list_test[j].append(normtarget_test[i]*length)          
-
-#                 gridded_counts_test[j] += 1
-#                 #lenlist.append(length)
-                
-# #find mean of norm residual
-# gridded_targetsnorm_list_test = np.asarray(gridded_targetsnorm_list_test)
-
-# griddednorm_mean_test=np.zeros((len(gridded_targetsnorm_list_test),10))
-# for i in range(len(gridded_targetsnorm_list_test)):
-#     griddednorm_mean_test[i] = np.mean(gridded_targetsnorm_list_test[i],axis=0)
-
-# #find the cells with no paths (nans)
-# nan_ind=np.argwhere(np.isnan(griddednorm_mean_test)).flatten()
-# # set nan elements for empty array
-# # not sureif this isbest orto leaveas a nan
-# for i in nan_ind:
-#     griddednorm_mean_test[i] =0
-
-
+hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts = grid_data(train_data1, train_targets1, df, nsamples = nsamples)           
 #%%
 
 #find mean of norm residual
@@ -165,9 +55,8 @@ for i in range(len(gridded_targetsnorm_list)):
 #find the cells with no paths (nans)
 nan_ind=np.argwhere(np.isnan(griddednorm_mean)).flatten()
 # set nan elements for empty array
-# not sureif this isbest orto leaveas a nan
 for i in nan_ind:
-    griddednorm_mean[i] =0
+    griddednorm_mean[i] = 0
 
 
 #add gridded mean and gridded counts to df
@@ -234,7 +123,7 @@ plt.show()
 #%%
 y_train = griddednorm_mean
 
-x_test
+# x_test
 x_train = df.drop(['polygon','counts'], axis=1)
 
 transform = Normalizer()
@@ -248,6 +137,7 @@ def build_model():
     model = Sequential()
     model.add(layers.Dense(train_data.shape[1],activation='sigmoid', input_shape=(train_data.shape[1],)))
     # model.add(layers.Dense(10))
+    # model.add(RBFLayer(10, 2))
 
     #no gP layer
     model.add(layers.Dense(10))
@@ -259,7 +149,7 @@ def build_model():
 model=build_model()
 
 #fit the model
-history=model.fit(train_data,y_train,epochs=100,batch_size=batch_size,verbose=1)
+history=model.fit(train_data,y_train,epochs=10,batch_size=batch_size,verbose=1)
 
 # mae_history=history.history['val_mae']
 mae_history_train=history.history['mae']
@@ -269,6 +159,36 @@ pre = model.predict(train_data)
 # r = np.asarray(y_train)-pre.flatten()
 r = (y_train)-pre
 
+
+period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
+
+##################
+
+diff=np.std(r,axis=0)
+# diffmean=np.mean(y_train-mean_x_train_allT,axis=0)
+f22=plt.figure('Difference Std of residuals vs Period')
+plt.semilogx(period,diff,label='Training ')
+# plt.semilogx(period,difftest,label='Testing')
+plt.xlabel('Period')
+plt.ylabel('Total Standard Deviation')
+plt.legend()
+plt.savefig(folder_path + 'resid_T.png')
+plt.show()
+
+diffmean=np.mean(r,axis=0)
+# diffmeantest=np.mean(resid_test-mean_x_test_allT,axis=0)
+f22=plt.figure('Difference Std of residuals vs Period')
+plt.semilogx(period,diffmean,label='Training ')
+# plt.semilogx(period,diffmeantest,label='Testing')
+plt.xlabel('Period')
+plt.ylabel('Mean residual')
+plt.legend()
+plt.savefig(folder_path + 'mean_T.png')
+plt.show()
+
+
+
+
 for i in range(10):
     T= period[i]
     y = pre.T[i]
@@ -277,9 +197,50 @@ for i in range(10):
     lim = np.max(np.asarray([abs(x), abs(y)]).flatten())
     plt.scatter(x,y,s=1)
     plt.xlabel('observed')
-    plt.xlabel('predicted')
+    plt.ylabel('predicted')
     plt.title('T ' + str(T) + ' s')
     plt.xlim(-1*lim, lim)
     plt.ylim(-1*lim, lim)
     plt.savefig(folder_path + 'obs_pre_T_' + str(T) + '.png')
     plt.show()
+
+
+
+
+
+
+
+
+#%%
+
+
+from keras.layers import Layer
+from keras import backend as K
+
+class RBFLayer(Layer):
+    def __init__(self, units, gamma, **kwargs):
+        super(RBFLayer, self).__init__(**kwargs)
+        self.units = units
+        self.gamma = K.cast_to_floatx(gamma)
+
+    def build(self, input_shape):
+#         print(input_shape)
+#         print(self.units)
+        self.mu = self.add_weight(name='mu',
+                                  shape=(int(input_shape[1]), self.units),
+                                  initializer='uniform',
+                                  trainable=True)
+        super(RBFLayer, self).build(input_shape)
+
+    def call(self, inputs):
+        diff = K.expand_dims(inputs) - self.mu
+        l2 = K.sum(K.pow(diff, 2), axis=1)
+        res = K.exp(-1 * self.gamma * l2)
+        return res
+
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], self.units)
+
+
+
+
