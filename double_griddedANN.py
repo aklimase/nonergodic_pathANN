@@ -166,10 +166,13 @@ if not os.path.exists(folder_path):
 resid_test = y_test-mean_x_test_allT
 resid_train = y_train-mean_x_train_allT
 
-df, lon, lat = create_grid(dx = 0.5)
-nsamples = len(x_train)
+df, lon, lat = create_grid(dx = 0.05)
+nsamples = 1000
+
 hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts = grid_data(train_data1, train_targets1 = resid_train, df=df, nsamples = nsamples)     
-hypoR_test, sitelat_test, sitelon_test, evlat_test, evlon_test, target_test, gridded_targetsnorm_list_test, gridded_counts_test = grid_data(test_data1, train_targets1 = resid_test, df=df, nsamples = nsamples)                 
+hypoR_test, sitelat_test, sitelon_test, evlat_test, evlon_test, target_test, gridded_targetsnorm_list_test, gridded_counts_test = grid_data(test_data1, train_targets1 = resid_test, df=df, nsamples = nsamples)    
+
+             
 #%%
 
 #find mean of norm residual
@@ -209,7 +212,7 @@ x_train = df.drop(['polygon','counts'], axis=1)
 transform = Normalizer()
 aa=transform.fit(x_train)
 train_data=aa.transform(x_train)
-# test_data=aa.transform(x_test)
+test_data=aa.transform(x_test)
 
 batch_size = 264
 

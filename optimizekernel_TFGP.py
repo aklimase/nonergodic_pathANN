@@ -8,12 +8,13 @@ Created on Tue Jul  7 14:50:44 2020
 
 toy data set from main data
 optimize the kernel
-sequential model with VGP layer
+sequential model with VGP layer for epistemic uncertainty
 """
 
-
-#try epistemic uncertainty '
-
+import sys
+import os
+sys.path.append(os.path.abspath('/Users/aklimasewski/Documents/nonergodic_ANN'))
+from preprocessing import transform_dip, readindata, transform_data, create_grid, grid_data
 
 from pprint import pprint
 import matplotlib.pyplot as plt
@@ -41,122 +42,12 @@ sns.reset_defaults()
 #sns.set_context('talk')
 sns.set_context(context='talk',font_scale=0.7)
 
-
 tfd = tfp.distributions
 
+nametrain='/Users/aklimase/Documents/USGS/data/cybertrainyeti10_residfeb.csv'
+nametest='/Users/aklimase/Documents/USGS/data/cybertestyeti10_residfeb.csv'
+train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain, nametest, n=12)
 
-
-###############
-#recreate the demo with one input and one output only
-
-# %%
-
-def transform_dip(diptrain,diptest,rxtrain,rxtest):
-    for i in range(len(diptrain)):
-        if diptrain[i]>30:
-            rxtrain[i]=rxtrain[i]*(90-diptrain[i])/45
-        else:
-            rxtrain[i]=rxtrain[i]*60/45
-            
-    for i in range(len(diptest)): 
-        if diptest[i]>30:
-            rxtest[i]=rxtest[i]*(90-diptest[i])/45
-        else:
-            rxtest[i]=rxtest[i]*60/45    
-    #return the transformed arrays
-    return diptrain, diptest, rxtrain, rxtest
-
-
-def readindata(nametrain, nametest):
-#Read in datasets
-# nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv'
-# nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv'
-    
-    dftrain = pd.read_pickle(nametrain) 
-    dftest = pd.read_pickle(nametest)
-    print(dftrain.shape)
-    print(dftest.shape)
-    
-    
-    #separate dataframe to pandas series (1 col of df)
-    Mwtrain= dftrain["Mag"]
-    distrain=dftrain["Site_Rupture_Dist"]
-    vs30train=np.array(dftrain["vs30"])
-    z10train=dftrain["z10"]
-    z25train=dftrain["z25"]
-    lattrain=dftrain["CS_Site_Lat"]
-    longtrain=dftrain["CS_Site_Lon"]
-    periodtrain=dftrain["siteperiod"]
-    hypolattrain=dftrain["Hypocenter_Lat"]
-    hypolontrain=dftrain["Hypocenter_Lon"]
-    hypodepthtrain=dftrain["Hypocenter_Depth"]
-    raketrain=dftrain["Rake_y"]
-    diptrain=dftrain["Dip_y"]
-    striketrain=dftrain["Strike_y"]+180
-    widthtrain=dftrain["Width"]
-    #Outputs (col per period)
-    residtesttemp=dftrain.loc[:, 'IM_Value':'IM175']
-    train_targets1=residtesttemp.values
-    
-    #histogram of output (1 period of IM175)
-    plt.hist(train_targets1[:,3],100)
-    
-    lengthtrain=dftrain["Length"]
-    rjbtrain=dftrain["rjb"]
-    rxtrain=dftrain["rx"]
-    rytrain=dftrain["ry"]
-    hypodistrain=dftrain["hypodistance"]
-    Utrain=dftrain["U"]
-    Ttrain=dftrain["T"]
-    xitrain=dftrain["xi"]
-    startdepthtrain=dftrain["Start_Depth"]
-    
-    
-    #### same with testdata
-    Mwtest= dftest["Mag"]
-    distest=dftest["Site_Rupture_Dist"]
-    vs30test=np.array(dftest["vs30"])
-    z10test=dftest["z10"]
-    z25test=dftest["z25"]
-    lattest=dftest["CS_Site_Lat"]
-    longtest=dftest["CS_Site_Lon"]
-    periodtest=dftest["siteperiod"]
-    hypolattest=dftest["Hypocenter_Lat"]
-    hypolontest=dftest["Hypocenter_Lon"]
-    hypodepthtest=dftest["Hypocenter_Depth"]
-    raketest=dftest["Rake_y"]
-    diptest=dftest["Dip_y"]
-    striketest=dftest["Strike_y"]+180
-    widthtest=dftest["Width"]
-    residtesttemp1=dftest.loc[:, 'IM_Value':'IM175']
-    test_targets1=residtesttemp1.values
-    lengthtest=dftest["Length"]
-    rjbtest=dftest["rjb"]
-    rxtest=dftest["rx"]
-    rytest=dftest["ry"]
-    hypodistest=dftest["hypodistance"]
-    Utest=dftest["U"]
-    Ttest=dftest["T"]
-    xitest=dftest["xi"]
-    startdepthtest=dftest["Start_Depth"]
-    
-    diptrain, diptest, rxtrain, rxtest = transform_dip(diptrain=np.array(diptrain),diptest=np.array(diptest),rxtrain=np.array(rxtrain),rxtest=np.array(rxtest))
-    
-    #put together arrays of features for ANN
-    #starting with just lat,lon of station and event    
-    train_data1 = np.column_stack([Mwtrain, lattrain, longtrain, hypolattrain, hypolontrain])
-    test_data1 = np.column_stack([Mwtest, lattest, longtest, hypolattest, hypolontest])
-
-    
-    feature_names=['Mw','r','stlat', 'stlon', 'hypolat','hypolon']
-    return train_data1, test_data1, train_targets1, test_targets1, feature_names
-
-
-
-train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv')
-#Read in datasets
-# nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv'
-# nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv'
 #%%
 #preprocessing transform inputs data to be guassian shaped
 pt = PowerTransformer()
@@ -181,7 +72,7 @@ tfk = tfp.math.psd_kernels
 
 # observations = y_train.reshape(len(y_train),1)
 # index_points = np.asarray([np.linspace(*x_range,num_inducing_points)])
-# index_points = x_train
+index_points = x_train
 #%%
 #optimize kernel
 
@@ -254,7 +145,7 @@ def target_log_prob(amplitude, length_scale, observation_noise_variance):
       'amplitude': amplitude,
       'length_scale': length_scale,
       'observation_noise_variance': observation_noise_variance,
-       'observations': observations
+     # 'observations': observations
   })
 
 
@@ -315,175 +206,7 @@ class OptKernelFn(tf.keras.layers.Layer):
        amplitude=amplitude_var,
        length_scale=length_scale_var)
 
-
-
-
-
-
 #%%
-#optimize kernel
-
-# Generate training data with a known noise level (we'll later try to recover
-# this value from the data).
-
-#this works with 1 input
-#higher output dimensions?
-observations_ = train_targets[:, 0:1].flatten()
-
-event_size = 2
-
-observation_index_points_ = x_train[:, 0:1]
-# observation_index_points_ = x_train[:, 0:2]
-
-observations_ = y_train.flatten()
-event_size = 6
-observation_index_points_ = x_train
-# observation_index_points_ = x_train[:, 0:2]
-
-def build_gp(amplitude, length_scale, observation_noise_variance):
-  """Defines the conditional dist. of GP outputs, given kernel parameters."""
-
-  # Create the covariance kernel, which will be shared between the prior (which we
-  # use for maximum likelihood training) and the posterior (which we use for
-  # posterior predictive sampling)
-  kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
-  #tfk.MaternOneHalf(
-
-  # Create the GP prior distribution, which we will use to train the model
-  # parameters.
-  return tfd.GaussianProcess(
-      kernel=kernel,
-      index_points=observation_index_points_,
-      observation_noise_variance=observation_noise_variance)
-
-gp_joint_model = tfd.JointDistributionNamed({
-    'amplitude': tfd.LogNormal(loc=tf.Variable(tf.zeros(event_size,dtype=np.float64)),
-        scale=tfp.util.TransformedVariable(
-            tf.ones([event_size, 1],dtype=np.float64),bijector=tfb.Exp())),
-    'length_scale': tfd.LogNormal(loc=tf.Variable(tf.zeros(event_size,dtype=np.float64)),
-        scale=tfp.util.TransformedVariable(
-            tf.ones([event_size, 1],dtype=np.float64),bijector=tfb.Exp())),
-    'observation_noise_variance': tfd.LogNormal(loc=tf.Variable(tf.zeros(event_size,dtype=np.float64)),
-        scale=tfp.util.TransformedVariable(
-            tf.ones([event_size, 1],dtype=np.float64),bijector=tfb.Exp())),
-    'observations': build_gp,
-})
-
-x = gp_joint_model.sample()
-lp = gp_joint_model.log_prob(x)
-
-print("sampled {}".format(x))
-print("log_prob of sample: {}".format(lp))
-
-# Create the trainable model parameters, which we'll subsequently optimize.
-# Note that we constrain them to be strictly positive.
-
-constrain_positive = tfb.Shift(np.finfo(np.float64).tiny)(tfb.Exp())
-
-amplitude_var = tfp.util.TransformedVariable(
-    initial_value=tf.ones(event_size,dtype=np.float64),
-    bijector=constrain_positive,
-    name='amplitude',
-    dtype=np.float64)
-
-length_scale_var = tfp.util.TransformedVariable(
-    initial_value=tf.ones(event_size,dtype=np.float64),
-    bijector=constrain_positive,
-    name='length_scale',
-    dtype=np.float64)
-
-observation_noise_variance_var = tfp.util.TransformedVariable(
-    initial_value=tf.ones(event_size,dtype=np.float64),
-    bijector=constrain_positive,
-    name='observation_noise_variance_var',
-    dtype=np.float64)
-
-trainable_variables = [v.trainable_variables[0] for v in 
-                       [amplitude_var,
-                       length_scale_var,
-                       observation_noise_variance_var]]
-
-
-# Use `tf.function` to trace the loss for more efficient evaluation.
-@tf.function(autograph=False, experimental_compile=False)
-def target_log_prob(amplitude, length_scale, observation_noise_variance):
-  return gp_joint_model.log_prob({
-      'amplitude': amplitude,
-      'length_scale': length_scale,
-      'observation_noise_variance': observation_noise_variance,
-      'observations': observations_
-  })
-
-# Now we optimize the model parameters.
-num_iters = 20
-optimizer = tf.optimizers.Adam(learning_rate=.01)
-
-# Store the likelihood values during training, so we can plot the progress
-lls_ = np.zeros((num_iters,2), np.float64)
-for i in range(num_iters):
-  with tf.GradientTape() as tape:
-    loss = -target_log_prob(amplitude_var, length_scale_var,
-                            observation_noise_variance_var)
-    print(loss)
-  grads = tape.gradient(loss, trainable_variables)
-  optimizer.apply_gradients(zip(grads, trainable_variables))
-  lls_[i] = loss[0]
-
-print('Trained parameters:')
-print('amplitude: {}'.format(amplitude_var._value().numpy()))
-print('length_scale: {}'.format(length_scale_var._value().numpy()))
-print('observation_noise_variance: {}'.format(observation_noise_variance_var._value().numpy()))
-
-
-#plot loss
-plt.figure(figsize=(12, 4))
-plt.plot(lls_)
-plt.xlabel("Training iteration")
-plt.ylabel("Log marginal likelihood")
-plt.show()
-
-
-optimized_kernel = tfk.MaternOneHalf(amplitude_var, length_scale_var)
-noise = observation_noise_variance_var._value().numpy()
-
-#class for optimized kernel
-class OptKernelFn(tf.keras.layers.Layer):
-  def __init__(self, **kwargs):
-    super(OptKernelFn, self).__init__(**kwargs)
-    dtype = kwargs.get('dtype', None)
-
-    self._amplitude = self.add_variable(
-            initializer=tf.constant_initializer(0),
-            dtype=dtype,
-            name='amplitude')
-    
-    self._length_scale = self.add_variable(
-            initializer=tf.constant_initializer(0),
-            dtype=dtype,
-            name='length_scale')
-
-  def call(self, x):
-    # Never called -- this is just a layer so it can hold variables
-    # in a way Keras understands.
-    return x
-
-  @property
-  def kernel(self):
-     return tfk.MaternOneHalf(
-       amplitude=amplitude_var,
-       length_scale=length_scale_var)
-
-
-
-
-
-#%%
-
-
-
-#%%
-
-
 
 #########################
 

@@ -9,6 +9,7 @@ import sys
 import os
 sys.path.append(os.path.abspath('/Users/aklimasewski/Documents/nonergodic_ANN'))
 from preprocessing import transform_dip, readindata, transform_data, create_grid, grid_data
+from model_plots import gridded_plots, plot_resid, obs_pre
 
 import shapely
 import shapely.geometry
@@ -32,6 +33,7 @@ import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 from keras import layers
 from keras import optimizers
+
 
 folder_path = '/Users/aklimase/Documents/USGS/models/gridded_ANN/model12/'
 
@@ -63,61 +65,62 @@ for i in nan_ind:
 df['counts'] = gridded_counts
 period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 
+gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evlat, sitelon, sitelat, folder_path)
 
-for i in range(len(griddednorm_mean.T)):
-    T= period[i]
-    g = griddednorm_mean.T[i]
-    Z = g.reshape(len(lat)-1,len(lon)-1)
+# for i in range(len(griddednorm_mean.T)):
+#     T= period[i]
+#     g = griddednorm_mean.T[i]
+#     Z = g.reshape(len(lat)-1,len(lon)-1)
     
-    cbound = max(np.abs(g))
-    cbound = 0.12
+#     cbound = max(np.abs(g))
+#     cbound = 0.12
 
-    cmap = mpl.cm.get_cmap('seismic')
-    normalize = mpl.colors.Normalize(vmin=-1*cbound, vmax=cbound)
-    colors = [cmap(normalize(value)) for value in Z]
-    s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
-    s_m.set_array([])
+#     cmap = mpl.cm.get_cmap('seismic')
+#     normalize = mpl.colors.Normalize(vmin=-1*cbound, vmax=cbound)
+#     colors = [cmap(normalize(value)) for value in Z]
+#     s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
+#     s_m.set_array([])
         
-    fig, ax = plt.subplots(figsize = (10,8))
-    plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
-    plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
-    plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
-    plt.xlim(min(lon),max(lon))
-    plt.ylim(min(lat),max(lat))
-    plt.title('T ' + str(T) + ' s')
-    plt.legend(loc = 'lower left')
+#     fig, ax = plt.subplots(figsize = (10,8))
+#     plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
+#     plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
+#     plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
+#     plt.xlim(min(lon),max(lon))
+#     plt.ylim(min(lat),max(lat))
+#     plt.title('T ' + str(T) + ' s')
+#     plt.legend(loc = 'lower left')
     
-    fig.subplots_adjust(right=0.75)
-    cbar = plt.colorbar(s_m, orientation='vertical')
-    cbar.set_label(r'average normalized residual (resid/km)', fontsize = 20)
-    plt.savefig(folder_path + 'normresid_T_' + str(T) + '.png')
-    plt.show()
+#     fig.subplots_adjust(right=0.75)
+#     cbar = plt.colorbar(s_m, orientation='vertical')
+#     cbar.set_label(r'average normalized residual (resid/km)', fontsize = 20)
+#     plt.savefig(folder_path + 'normresid_T_' + str(T) + '.png')
+#     plt.show()
     
 
-# counts
-Z = gridded_counts.reshape(len(lat)-1,len(lon)-1)
+# # counts
+# Z = gridded_counts.reshape(len(lat)-1,len(lon)-1)
 
-cbound = max(np.abs(gridded_counts))
-cmap = mpl.cm.get_cmap('Greens')
-normalize = mpl.colors.Normalize(vmin=0, vmax=cbound)
-colors = [cmap(normalize(value)) for value in Z]
-s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
-s_m.set_array([])
+# cbound = max(np.abs(gridded_counts))
+# cmap = mpl.cm.get_cmap('Greens')
+# normalize = mpl.colors.Normalize(vmin=0, vmax=cbound)
+# colors = [cmap(normalize(value)) for value in Z]
+# s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
+# s_m.set_array([])
 
-fig, ax = plt.subplots(figsize = (10,8))
-plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
-plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
-plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
-plt.xlim(min(lon),max(lon))
-plt.ylim(min(lat),max(lat))
-plt.title('T ' + str(T) + ' s')
-plt.legend(loc = 'lower left')
+# fig, ax = plt.subplots(figsize = (10,8))
+# plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
+# plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
+# plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
+# plt.xlim(min(lon),max(lon))
+# plt.ylim(min(lat),max(lat))
+# plt.title('T ' + str(T) + ' s')
+# plt.legend(loc = 'lower left')
 
-fig.subplots_adjust(right=0.75)
-cbar = plt.colorbar(s_m, orientation='vertical')
-cbar.set_label(r'paths per cell', fontsize = 20)
-plt.savefig(folder_path + 'pathcounts.png')
-plt.show()
+# fig.subplots_adjust(right=0.75)
+# cbar = plt.colorbar(s_m, orientation='vertical')
+# cbar.set_label(r'paths per cell', fontsize = 20)
+# plt.savefig(folder_path + 'pathcounts.png')
+# plt.show()
 
 
 #%%
@@ -163,46 +166,51 @@ r = (y_train)-pre
 period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 
 ##################
+resid = r
+resid_test = []
+pre_test = []
+y_test = []
+plot_resid(resid, resid_test, pre, pre_test, y_train, y_test, folder_path)
 
-diff=np.std(r,axis=0)
-# diffmean=np.mean(y_train-mean_x_train_allT,axis=0)
-f22=plt.figure('Difference Std of residuals vs Period')
-plt.semilogx(period,diff,label='Training ')
-# plt.semilogx(period,difftest,label='Testing')
-plt.xlabel('Period')
-plt.ylabel('Total Standard Deviation')
-plt.legend()
-plt.savefig(folder_path + 'resid_T.png')
-plt.show()
+# diff=np.std(r,axis=0)
+# # diffmean=np.mean(y_train-mean_x_train_allT,axis=0)
+# f22=plt.figure('Difference Std of residuals vs Period')
+# plt.semilogx(period,diff,label='Training ')
+# # plt.semilogx(period,difftest,label='Testing')
+# plt.xlabel('Period')
+# plt.ylabel('Total Standard Deviation')
+# plt.legend()
+# plt.savefig(folder_path + 'resid_T.png')
+# plt.show()
 
-diffmean=np.mean(r,axis=0)
-# diffmeantest=np.mean(resid_test-mean_x_test_allT,axis=0)
-f22=plt.figure('Difference Std of residuals vs Period')
-plt.semilogx(period,diffmean,label='Training ')
-# plt.semilogx(period,diffmeantest,label='Testing')
-plt.xlabel('Period')
-plt.ylabel('Mean residual')
-plt.legend()
-plt.savefig(folder_path + 'mean_T.png')
-plt.show()
-
-
+# diffmean=np.mean(r,axis=0)
+# # diffmeantest=np.mean(resid_test-mean_x_test_allT,axis=0)
+# f22=plt.figure('Difference Std of residuals vs Period')
+# plt.semilogx(period,diffmean,label='Training ')
+# # plt.semilogx(period,diffmeantest,label='Testing')
+# plt.xlabel('Period')
+# plt.ylabel('Mean residual')
+# plt.legend()
+# plt.savefig(folder_path + 'mean_T.png')
+# plt.show()
 
 
-for i in range(10):
-    T= period[i]
-    y = pre.T[i]
-    x = y_train.T[i]
-    plt.figure(figsize = (6,6))
-    lim = np.max(np.asarray([abs(x), abs(y)]).flatten())
-    plt.scatter(x,y,s=1)
-    plt.xlabel('observed')
-    plt.ylabel('predicted')
-    plt.title('T ' + str(T) + ' s')
-    plt.xlim(-1*lim, lim)
-    plt.ylim(-1*lim, lim)
-    plt.savefig(folder_path + 'obs_pre_T_' + str(T) + '.png')
-    plt.show()
+obs_pre(y_train, y_test, pre, pre_test, folder_path)
+
+# for i in range(10):
+#     T= period[i]
+#     y = pre.T[i]
+#     x = y_train.T[i]
+#     plt.figure(figsize = (6,6))
+#     lim = np.max(np.asarray([abs(x), abs(y)]).flatten())
+#     plt.scatter(x,y,s=1)
+#     plt.xlabel('observed')
+#     plt.ylabel('predicted')
+#     plt.title('T ' + str(T) + ' s')
+#     plt.xlim(-1*lim, lim)
+#     plt.ylim(-1*lim, lim)
+#     plt.savefig(folder_path + 'obs_pre_T_' + str(T) + '.png')
+#     plt.show()
 
 
 

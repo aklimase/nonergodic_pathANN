@@ -10,6 +10,7 @@ based on demo
 https://woogle.dev/michel-kana/my-deep-learning-model-says-sorry-i-dont-know-the-answer-that-s-absolutely-ok/
 aleatory and epistemic uncertainty in linear data with two groups of aleatory uncertainty
 
+generates linear data with two populations of noise
 
 """
 
@@ -27,21 +28,8 @@ tfk = tfp.math.psd_kernels
 # We'll use double precision throughout for better numerics.
 dtype = np.float64
 
-# Generate noisy data from a known function.
-f = lambda x: np.exp(-x[..., 0]**2 / 20.) * np.sin(1. * x[..., 0])
-true_observation_noise_variance_ = dtype(1e-1) ** 2
-
-# #datafrom demo
-num_training_points_ = 1000
-
-# x_train_ = np.random.uniform(-10., 10., [num_training_points_, 1])
-# y_train_ = (f(x_train_) +
-#             np.random.normal(
-#                 0., np.sqrt(true_observation_noise_variance_),
-#                 [num_training_points_]))
-# y_train_ = np.concatenate([y_train_, x_train_[num_training_points_:] + np.random.randn(*x_train_[num_training_points_:].shape)*0.1]).flatten()
-
-n = 500
+# # Generate noisy data from a known function.
+n = 50
 x_func = np.linspace(-4,4,100)
 y_func = x_func
 
@@ -53,14 +41,11 @@ y_train = np.concatenate([y_train, x_train[n:] + np.random.randn(*x_train[n:].sh
 
 x_test = np.linspace(-5,5,100)
 y_test = x_test
-x_test = x_test.reshape(100,1)
-
-x_train_ = x_train.reshape(num_training_points_,1)
-y_train_ = y_train
+# x_test = x_test.reshape(100,1)
 
 fig, ax = plt.subplots(1,1,figsize=(10,5))
-ax.scatter(x_train_, y_train_, label='training data', s = 3)
-# ax.plot(x_func, y_func, ls='--', label='real function', color='green')
+ax.scatter(x_train, y_train, label='training data', s = 3)
+ax.plot(x_func, y_func, ls='--', label='real function', color='green')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 ax.legend()
@@ -68,9 +53,8 @@ ax.set_title('Data with uncertainty')
 plt.show()
 
 #%%
-# Build model.
+# Build model with negattive log likelihood loss function
 negloglik = lambda y, p_y: -p_y.log_prob(y)
-
 
 model = tf.keras.Sequential([
   tf.keras.layers.Dense(1 + 1),
@@ -81,7 +65,7 @@ model = tf.keras.Sequential([
 
 # Do inference.
 model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.05), loss=negloglik)
-model.fit(x_train_, y_train_, epochs=500, verbose=True)
+model.fit(x_train, y_train, epochs=500, verbose=True)
 
 # Make predictions.
 yhat = model.predict(x_test)
@@ -97,14 +81,14 @@ for i in range(100):
 mean_x_test = np.mean(predict_mean, axis = 0)
 predict_epistemic = np.std(predict_mean, axis = 0)
 
-
-
-plt.figure(figsize=(15, 5))
-plt.scatter(x_train_,y_train_,s=2)
-plt.errorbar(x_test,mean_x_test,yerr = predict_epistemic)
-
+fig, ax = plt.subplots(1,1,figsize=(10,5))
+ax.scatter(x_train,y_train,s=3, label = 'training data')
+ax.errorbar(x_test,mean_x_test,yerr = predict_epistemic, c = 'green', label = 'predictions with 1 sigma error')
+ax.set_xlabel('x')
+ax.set_ylabel('y')
+ax.legend()
+ax.set_title('Predictions with epistemic uncertainty')
 plt.show()
-
 
 #%%
 # Create kernel with trainable parameters, and trainable observation noise
@@ -131,8 +115,8 @@ variational_loc, variational_scale = (
     tfd.VariationalGaussianProcess.optimal_variational_posterior(
         kernel=kernel,
         inducing_index_points=inducing_index_points,
-        observation_index_points=x_train_,
-        observations=y_train_,
+        observation_index_points=x_train,
+        observations=y_train,
         observation_noise_variance=observation_noise_variance))
 
 # These are the index point locations over which we'll construct the
@@ -153,6 +137,7 @@ vgp = tfd.VariationalGaussianProcess(
 
 # For training, we use some simplistic numpy-based minibatching.
 batch_size = 64
+num_training_points= num_predictive_index_points_
 
 optimizer = tf.optimizers.Adam(learning_rate=.05, beta_1=.5, beta_2=.99)
 
@@ -163,7 +148,7 @@ def optimize(x_train_batch, y_train_batch):
     loss = vgp.variational_loss(
         observations=y_train_batch,
         observation_index_points=x_train_batch,
-        kl_weight=float(batch_size) / float(num_training_points_))
+        kl_weight=float(batch_size) / float(num_training_points))
   grads = tape.gradient(loss, vgp.trainable_variables)
   optimizer.apply_gradients(zip(grads, vgp.trainable_variables))
   return loss
@@ -171,11 +156,11 @@ def optimize(x_train_batch, y_train_batch):
 num_iters = 500
 num_logs = 10
 for i in range(num_iters):
-  batch_idxs = np.random.randint(num_training_points_, size=[batch_size])
-  x_train_batch_ = x_train_[batch_idxs, ...]
-  y_train_batch_ = y_train_[batch_idxs]
+  batch_idxs = np.random.randint(num_training_points, size=[batch_size])
+  x_train_batch = x_train[batch_idxs, ...]
+  y_train_batch = y_train[batch_idxs]
 
-  loss = optimize(x_train_batch_, y_train_batch_)
+  loss = optimize(x_train_batch, y_train_batch)
   if i % (num_iters / num_logs) == 0 or i + 1 == num_iters:
     print(i, loss.numpy())
 
@@ -196,7 +181,7 @@ variational_loc_ = variational_loc.numpy()
 plt.figure(figsize=(15, 5))
 # plt.scatter(inducing_index_points_[..., 0], variational_loc_,
             # marker='x', s=50, color='k', zorder=10)
-plt.scatter(x_train_[..., 0], y_train_, color='#00ff00', alpha=.1, zorder=9)
+plt.scatter(x_train[..., 0], y_train, color='#00ff00', alpha=.1, zorder=9)
 # plt.plot(np.tile(index_points_, num_samples),
           # samples_.T, color='r', alpha=.1)
 plt.errorbar(index_points_, mean_,yerr= np.std(samples_, axis = 0))

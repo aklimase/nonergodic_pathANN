@@ -60,7 +60,6 @@ epochs = 15
 n = 12
 #or n = 6, 4
 
-
 train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/USGS/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/USGS/data/cybertestyeti10_residfeb.csv', n = n)
 
 x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path)

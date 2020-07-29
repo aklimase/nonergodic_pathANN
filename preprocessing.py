@@ -12,6 +12,8 @@ def transform_dip(diptrain,diptest,rxtrain,rxtest):
     '''
     transforms cybershake dips and Rx
     
+    Parameters
+    ----------
     diptrain: numpy array of cybershake fault dips of training data
     diptest: numpy array of cybershake fault dips of testing data
     rxtrain: numpy array of rx train
@@ -38,6 +40,8 @@ def readindata(nametrain, nametest, n):
     '''
     takes training and testing files and creates numpy arrays formatted for Kyle's code
     
+    Parameters
+    ----------
     nametrain: path of the training data file
     nametest: path of the testing data file
     n: number of input variables, corresponds to specific model
@@ -147,6 +151,8 @@ def transform_data(transform_method, train_data1, test_data1, train_targets1, te
     '''
     uses a sklearn transformation function to transform data for the ANN and creates hisogram of transformed variables
     
+    Parameters
+    ----------
     transform_method: name of transformation function (ex. Normalizer(), StandardScaler())
     train_data1: numpy array of training data
     test_data1: numpy array of testing data
@@ -266,6 +272,14 @@ def grid_data(train_data1, train_targets1, df, nsamples = 5000):
     evlat = train_data1[:,3][randindex]
     evlon = train_data1[:,4][randindex]
     target = train_targets1[:][randindex]
+    
+    
+    # hypoR = train_data1[:,0]
+    # sitelat = train_data1[:,1]
+    # sitelon = train_data1[:,2]
+    # evlat = train_data1[:,3]
+    # evlon = train_data1[:,4]
+    # target = train_targets1[:]
     
     normtarget = target / hypoR[:, np.newaxis]
     gridded_targetsnorm_list = [ [] for _ in range(df.shape[0]) ]
