@@ -135,7 +135,7 @@ def readindata(nametrain, nametest, n):
         feature_names=np.asarray(['stlat', 'stlon', 'hypolat','hypolon'])
    
     #defualt, cybershake ANN, n = 12
-    else: 
+    elif n ==12: 
         train_data1 = np.column_stack([Mwtrain,distrain,vs30train,z10train,z25train,raketrain,diptrain,hypodepthtrain, widthtrain,
                                 rjbtrain,rxtrain,startdepthtrain])
         test_data1 = np.column_stack([Mwtest,distest,vs30test,z10test,z25test,raketest,diptest, hypodepthtest, widthtest,
@@ -143,6 +143,22 @@ def readindata(nametrain, nametest, n):
 
         feature_names=np.asarray(['Mw','Rrup','Vs30', 'Z1.0', 'Z2.5', 'Rake','Dip','Hypo_depth', 'Width',
                 'Rjb','Rx','Ztor',])
+    elif n==13:
+        train_data1 = np.column_stack([Mwtrain,distrain,vs30train,z10train,z25train,raketrain,diptrain,hypodepthtrain, widthtrain,
+                                rjbtrain,rxtrain,startdepthtrain, xitrain])
+        test_data1 = np.column_stack([Mwtest,distest,vs30test,z10test,z25test,raketest,diptest, hypodepthtest, widthtest,
+                              rjbtest,rxtest,startdepthtest, xitest])
+
+        feature_names=np.asarray(['Mw','Rrup','Vs30', 'Z1.0', 'Z2.5', 'Rake','Dip','Hypo_depth', 'Width',
+                'Rjb','Rx','Ztor','xi',])
+    # elif n==16:
+    #     train_data1 = np.column_stack([Mwtrain,distrain,vs30train,z10train,z25train,raketrain,diptrain,hypodepthtrain, widthtrain,
+    #                             rjbtrain,rxtrain,startdepthtrain, xitrain, ])
+    #     test_data1 = np.column_stack([Mwtest,distest,vs30test,z10test,z25test,raketest,diptest, hypodepthtest, widthtest,
+    #                           rjbtest,rxtest,startdepthtest, xitest])
+
+    #     feature_names=np.asarray(['Mw','Rrup','Vs30', 'Z1.0', 'Z2.5', 'Rake','Dip','Hypo_depth', 'Width',
+    #             'Rjb','Rx','Ztor','xi',])
 
     return train_data1, test_data1, train_targets1, test_targets1, feature_names
 
@@ -206,11 +222,12 @@ def transform_data(transform_method, train_data1, test_data1, train_targets1, te
 
 def create_grid(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.05):
     '''
+    Parameters
+    ----------
     latmin: float minimum value of grid latitude, default 32 N
     latmax: float maximum value of grid latitude, default 37.5 N
     lonmin: float minimum value of grid longitude, default -121 W
     lonmax: float maximum value of grid longitude, default -115.5 W
-        DESCRIPTION. The default is -115.5.
     dx: float grid spacing in degrees default is 0.05.
 
     Returns
@@ -223,7 +240,7 @@ def create_grid(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.05):
     import shapely
     import pandas as pd
     
-    dx=0.1
+    # dx=0.1
     lon = np.arange(-121,-115.5, dx)
     lat = np.arange(32, 37.5, dx)
     
@@ -244,6 +261,8 @@ def create_grid(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.05):
     
 def grid_data(train_data1, train_targets1, df, nsamples = 5000):
     '''
+    Parameters
+    ----------
     train_data1: numpy array of training data for gridding
     train_targets1: numpy array of testing targets for gridding
     df: pandas dataframe of shapely polgons and midpoint of each grid cell in lat, lon
@@ -263,23 +282,25 @@ def grid_data(train_data1, train_targets1, df, nsamples = 5000):
     import numpy as np
     import geopy
     import random
+    import geopy.distance
+
     
-    randindex = random.sample(range(0, len(train_data1)), nsamples)
+    # randindex = random.sample(range(0, len(train_data1)), nsamples)
     
-    hypoR = train_data1[:,0][randindex]
-    sitelat = train_data1[:,1][randindex]
-    sitelon = train_data1[:,2][randindex]
-    evlat = train_data1[:,3][randindex]
-    evlon = train_data1[:,4][randindex]
-    target = train_targets1[:][randindex]
+    # hypoR = train_data1[:,0][randindex]
+    # sitelat = train_data1[:,1][randindex]
+    # sitelon = train_data1[:,2][randindex]
+    # evlat = train_data1[:,3][randindex]
+    # evlon = train_data1[:,4][randindex]
+    # target = train_targets1[:][randindex]
     
     
-    # hypoR = train_data1[:,0]
-    # sitelat = train_data1[:,1]
-    # sitelon = train_data1[:,2]
-    # evlat = train_data1[:,3]
-    # evlon = train_data1[:,4]
-    # target = train_targets1[:]
+    hypoR = train_data1[:,0]
+    sitelat = train_data1[:,1]
+    sitelon = train_data1[:,2]
+    evlat = train_data1[:,3]
+    evlon = train_data1[:,4]
+    target = train_targets1[:]
     
     normtarget = target / hypoR[:, np.newaxis]
     gridded_targetsnorm_list = [ [] for _ in range(df.shape[0]) ]
@@ -288,10 +309,12 @@ def grid_data(train_data1, train_targets1, df, nsamples = 5000):
     lenlist = []
     
     #loop through each record     
-    for i in range(len(sitelat)):                         
+    for i in range(len(sitelat)):                       
         line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
         path=shapely.geometry.LineString(line)
         #loop through each grid cell
+        if (i % 1000) == 0:
+        	print('record: ', str(i))
         for j in range(len(df)):
             shapely_poly = df['polygon'][j]
             if path.intersects(shapely_poly) == True:

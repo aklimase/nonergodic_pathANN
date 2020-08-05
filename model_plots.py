@@ -27,12 +27,12 @@ def plot_resid(resid, resid_test, folder_path):
     '''
     import numpy as np
     import matplotlib as mpl
-    import mpl.pyplot as plt
+    import matplotlib.pyplot as plt
     
     period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 
     diff=np.std(resid,axis=0)
-    difftest=np.mean(resid_test,axis=0)
+    difftest=np.std(resid_test,axis=0)
     f22=plt.figure('Difference Std of residuals vs Period')
     plt.semilogx(period,diff,label='Training ')
     plt.semilogx(period,difftest,label='Testing')
@@ -52,6 +52,7 @@ def plot_resid(resid, resid_test, folder_path):
     plt.legend()
     plt.savefig(folder_path + 'mean_T.png')
     plt.show()
+    plt.close('all')
     
 def obs_pre(y_train, y_test, pre, pre_test, period, folder_path):
     '''
@@ -62,17 +63,17 @@ def obs_pre(y_train, y_test, pre, pre_test, period, folder_path):
     
     import numpy as np
     import matplotlib as mpl
-    import mpl.pyplot as plt
+    import matplotlib.pyplot as plt
     for i in range(10):
         T= period[i]
         y = pre.T[i]
         x = y_train.T[i]
-        y_test = pre_test.T[i]
+        y_testplot = pre_test.T[i]
         x_test = y_test.T[i]
         plt.figure(figsize = (6,6))
         lim = np.max(np.asarray([abs(x), abs(y)]).flatten())
         plt.scatter(x,y,s=1,label='Training')
-        plt.scatter(x_test,y_test,s=1,label='Testing')
+        plt.scatter(x_test,y_testplot,s=1,label='Testing')
         plt.xlabel('observed')
         plt.ylabel('predicted')
         plt.title('T ' + str(T) + ' s')
@@ -80,7 +81,8 @@ def obs_pre(y_train, y_test, pre, pre_test, period, folder_path):
         plt.ylim(-1*lim, lim)
         plt.savefig(folder_path + 'obs_pre_T_' + str(T) + '.png')
         plt.show()
-    
+    plt.close('all')
+
     
     
 def gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evlat, sitelon, sitelat, folder_path):
@@ -100,7 +102,7 @@ def gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evl
     '''
     import numpy as np
     import matplotlib as mpl
-    import mpl.pyplot as plt
+    import matplotlib.pyplot as plt
     
     for i in range(len(griddednorm_mean.T)):
         T = period[i]
@@ -155,10 +157,11 @@ def gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evl
     cbar.set_label(r'paths per cell', fontsize = 20)
     plt.savefig(folder_path + 'pathcounts.png')
     plt.show()
+    plt.close('all')
 
 
 
-def x(folder_path, mean_x_test_allT, predict_epistemic_allT, mean_x_train_allT, predict_epistemic_train_allT, x_train, y_train, Rtrain, x_test, y_test, Rtest):
+def plot_outputs(folder_path, mean_x_test_allT, predict_epistemic_allT, mean_x_train_allT, predict_epistemic_train_allT, x_train, y_train, x_test, y_test, Rindex, period):
     '''
     Parameters
     ----------
@@ -166,12 +169,12 @@ def x(folder_path, mean_x_test_allT, predict_epistemic_allT, mean_x_train_allT, 
     import os
     import numpy as np
     import matplotlib as mpl
-    import mpl.pyplot as plt
+    import matplotlib.pyplot as plt
 
     #write frunction for either test or train
     folderlist = ['T10s','T7_5s','T5s','T4s','T3s','T2s','T1s','T_5s','T_2s','T_1s']
 
-    for j in range(0,3):#len(period)):
+    for j in range(len(period)):
     
         y_ind = j
         
@@ -194,8 +197,8 @@ def x(folder_path, mean_x_test_allT, predict_epistemic_allT, mean_x_train_allT, 
         ylim = max(np.abs(y_test[:,y_ind]))
         axes[0].set_ylim(-1*ylim,ylim)
         axes[1].set_ylim(-1*ylim,ylim)
-        axes[0].errorbar(Rtest, mean_x_test, yerr=predict_epistemic, fmt='.', label='predictions epistemic uncertainty', color='pink', alpha = 0.5, markeredgecolor='red')
-        axes[1].scatter(Rtest, y_test[:,y_ind], s=1, label='test targets', color='green')
+        axes[0].errorbar(x_test[:,Rindex], mean_x_test, yerr=predict_epistemic, fmt='.', label='predictions epistemic uncertainty', color='pink', alpha = 0.5, markeredgecolor='red')
+        axes[1].scatter(x_test[:,Rindex], y_test[:,y_ind], s=1, label='test targets', color='green')
         axes[1].set_xlabel('R (km)')
         axes[0].set_ylabel('prediction')
         axes[1].set_ylabel('target')
@@ -250,4 +253,6 @@ def x(folder_path, mean_x_test_allT, predict_epistemic_allT, mean_x_train_allT, 
         plt.legend()
         plt.savefig(folder_path + folderlist[j] + '/Histo.png')
         plt.show()
+        plt.close('all')
+
         
