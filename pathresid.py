@@ -113,10 +113,10 @@ df_out.to_csv(folder_path + 'avgrecord_targets_dx_1.csv')
 
 #%%
 
-df = pd.read_csv(folder_path + 'avgrecord_targets_dx_1.csv')
+df = pd.read_csv(folder_path + 'griddedtargets_dx_1.csv')
 
 gridcells = df['polygon']
-targets = df[['T10','T7.5','T5','T4','T3','T2','T1','T0.5','T0.2','T0.1']]
+targets = df[['T10test','T7.5test','T5test','T4test','T3test','T2test','T1test','T0.5test','T0.2test','T0.1test']]
 list_wkt = df['polygon']
 list_polygons =  [shapely.wkt.loads(poly) for poly in list_wkt]
 
@@ -278,7 +278,7 @@ period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 Rindex = np.where(feature_names == 'Rrup')[0][0]
 
 # plot_resid(resid = y_train-mean_x_train_allT, resid_test = y_test-mean_x_test_allT, folder_path = folder_path)
-plot_outputs(folder_path, mean_x_test_allT, predict_epistemic_allT, mean_x_train_allT, predict_epistemic_train_allT, x_train, y_train, x_test, y_test, Rindex, period)
+plot_outputs(folder_path, mean_x_test_allT, predict_epistemic_allT, mean_x_train_allT, predict_epistemic_train_allT, x_train, y_train, x_test, y_test, Rindex, period, feature_names)
 
 
 

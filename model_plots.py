@@ -159,9 +159,34 @@ def gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evl
     plt.show()
     plt.close('all')
 
+def plot_rawinputs(x_raw, mean_x_allT, y, feature_names, period, folder_path):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import os
 
+    folderlist = ['T10s','T7_5s','T5s','T4s','T3s','T2s','T1s','T_5s','T_2s','T_1s']
+    for j in range(len(period)):
+        # y_ind = j
+        mean_x_test = mean_x_allT[:,j:j+1].flatten()
+        if not os.path.exists(folder_path + folderlist[j]):
+            os.makedirs(folder_path + folderlist[j])
+        for i in range(len(x_raw[0])):
+            fig, axes = plt.subplots(2,1,figsize=(10,8))
+            plt.title('T = ' + str(period[j]) + ' s')
+            ylim = max(np.abs(y[:,j]))
+            axes[0].set_ylim(-1*ylim,ylim)
+            axes[1].set_ylim(-1*ylim,ylim)
+            axes[0].scatter(x_raw[:,i], mean_x_test,s=1, label='predictions', color='blue')
+            axes[1].scatter(x_raw[:,i], y[:,j], s=1, label='targets', color='green')
+            axes[1].set_xlabel(feature_names[i])
+            axes[0].set_ylabel('prediction')
+            axes[1].set_ylabel('target')
+            axes[0].legend(loc = 'upper left')
+            axes[1].legend(loc = 'upper left')
+            plt.savefig(folder_path + folderlist[j] + '/predictions_vs_' + feature_names[i] + '.png')
+            plt.show()
 
-def plot_outputs(folder_path, mean_x_test_allT, predict_epistemic_allT, mean_x_train_allT, predict_epistemic_train_allT, x_train, y_train, x_test, y_test, Rindex, period):
+def plot_outputs(folder_path, mean_x_test_allT, predict_epistemic_allT, mean_x_train_allT, predict_epistemic_train_allT, x_train, y_train, x_test, y_test, Rindex, period, feature_names):
     '''
     Parameters
     ----------
@@ -206,6 +231,23 @@ def plot_outputs(folder_path, mean_x_test_allT, predict_epistemic_allT, mean_x_t
         axes[1].legend(loc = 'upper left')
         plt.savefig(folder_path + folderlist[j] + '/Epistemic_vs_R.png')
         plt.show()
+        
+        # #
+        # for i in range(len(x_train)):
+        #     fig, axes = plt.subplots(2,1,figsize=(10,8))
+        #     plt.title('T = ' + str(period[y_ind]) + ' s')
+        #     ylim = max(np.abs(y_test[:,y_ind]))
+        #     axes[0].set_ylim(-1*ylim,ylim)
+        #     axes[1].set_ylim(-1*ylim,ylim)
+        #     axes[0].scatter(x_test[:,i], mean_x_test,s=1, label='predictions', color='blue')
+        #     axes[1].scatter(x_test[:,i], y_test[:,y_ind], s=1, label='test targets', color='green')
+        #     axes[1].set_xlabel(feature_names[i])
+        #     axes[0].set_ylabel('prediction')
+        #     axes[1].set_ylabel('target')
+        #     axes[0].legend(loc = 'upper left')
+        #     axes[1].legend(loc = 'upper left')
+        #     plt.savefig(folder_path + folderlist[j] + '/predictions_vs_' + feature_names[i] + '.png')
+        #     plt.show()
         
     
         f1=plt.figure('Hypo dist normalized Prediction')
