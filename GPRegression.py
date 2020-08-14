@@ -13,8 +13,8 @@ from gpflow.utilities import print_summary
 import sys
 import os
 sys.path.append(os.path.abspath('/Users/aklimase/Documents/USGS/nonergodic_ANN/'))
-from preprocessing import transform_dip, readindata, transform_data
-from model_plots import gridded_plots, obs_pre, plot_resid, plot_outputs, plot_rawinputs
+from preprocessing import transform_dip, readindata, transform_data, create_grid, grid_data
+from model_plots import gridded_plots, obs_pre, plot_resid, plot_outputs, plot_rawinputs, gridded_plots
 import random
 import pandas as pd
 import seaborn as sns
@@ -30,9 +30,10 @@ M = 15  # number of inducing points
 L = 2  # number of latent GPs
 P = 2  # number of observations = output dimensions
 
-folder_path = '/Users/aklimase/Documents/USGS/models/ANN13_VGP4/VGP4/'
+folder_path = '/Users/aklimase/Documents/USGS/models/ANN13_VGP4/VGP4_5iter/'
 # folder_path = '/Users/aklimase/Documents/USGS/models/baseANN/ANN13_VGP4/'
-
+if not os.path.exists(folder_path):
+    os.makedirs(folder_path)
 
 n=4
 train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimase/Documents/USGS/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimase/Documents/USGS/data/cybertestyeti10_residfeb.csv', n = n)
@@ -56,7 +57,6 @@ y_train_target1 = train_targets1[randindex]
 y_test_target1 = test_targets1[randindextest]
 
 period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
-
 
 GMresid = np.zeros((N,10))
 GMresid_test = np.zeros((N,10))
@@ -83,7 +83,7 @@ for i in range(len(y_train[0])):
     #optimize model parameters (variance and length scale)
     opt = gpflow.optimizers.Scipy()
     
-    opt_logs = opt.minimize(m.training_loss, m.trainable_variables, options=dict(maxiter=15))#, method = 'CG')
+    opt_logs = opt.minimize(m.training_loss, m.trainable_variables, options=dict(maxiter=5))#, method = 'CG')
     print_summary(m)
     # np.asarray([np.linspace(min(X[:,i]),max(X[:,i]), 100) for i in range(D)]).T  # test points must be of shape (N, D)
     
@@ -99,11 +99,11 @@ for i in range(len(y_train[0])):
     
 #test data
 mean_x_test_allT = GMresid_test
-predict_epistemic_allT = var_test
+predict_epistemic_allT = np.sqrt(var_test)
 
 #training data
 mean_x_train_allT = GMresid
-predict_epistemic_train_allT = var_train
+predict_epistemic_train_allT = np.sqrt(var_train)
 
 resid = y_train  -mean_x_train_allT
 resid_test = y_test -mean_x_test_allT
@@ -120,16 +120,56 @@ x_testANN = x_testANN[randindextest]
 
 plot_resid(resid, resid_test, folder_path)
 plot_outputs(folder_path, mean_x_test_allT, predict_epistemic_allT, mean_x_train_allT, predict_epistemic_train_allT, x_train, y_train, x_test, y_test, Rindex, period, feature_names)
-plot_rawinputs(x_raw = x_train, mean_x_allT = mean_x_train_allT, y=y_train, feature_names=feature_names, period = period, folder_path = folder_path + 'train/')
-plot_rawinputs(x_raw = x_test, mean_x_allT = mean_x_test_allT, y=y_test, feature_names=feature_names, period = period, folder_path = folder_path + 'test/')
+plot_rawinputs(x_raw = x_trainANN, mean_x_allT = mean_x_train_allT, y=y_train, feature_names=feature_names, period = period, folder_path = folder_path + 'train/')
+plot_rawinputs(x_raw = x_testANN, mean_x_allT = mean_x_test_allT, y=y_test, feature_names=feature_names, period = period, folder_path = folder_path + 'test/')
 
 obs_pre(y_train, y_test, GMresid, GMresid_test, period, folder_path)
 
+#%%
 #grid the predictions
+df, lon, lat = create_grid(dx = 0.1)
 
+n=6
+x_train6, x_test6, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimase/Documents/USGS/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimase/Documents/USGS/data/cybertestyeti10_residfeb.csv', n = n)
+x_train6 = x_train6[randindex]
+x_test6 = x_test6[randindextest]
 
+hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts = grid_data(x_train6, y_train, df=df, nsamples = N)     
+gridded_targetsnorm_list = np.asarray(gridded_targetsnorm_list)
 
+griddednorm_mean=np.zeros((len(gridded_targetsnorm_list),10))
+for i in range(len(gridded_targetsnorm_list)):
+    # for j in range(10):
+    griddednorm_mean[i] = np.mean(gridded_targetsnorm_list[i],axis=0)
 
+#find the cells with no paths (nans)
+nan_ind=np.argwhere(np.isnan(griddednorm_mean)).flatten()
+# set nan elements for empty array
+for i in nan_ind:
+    griddednorm_mean[i] = 0
+    
+gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evlat, sitelon, sitelat, folder_path + 'traingrid/')
+
+#%%
+#test
+hypoRtest, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts = grid_data(x_test6, y_test, df=df, nsamples = N)     
+gridded_targetsnorm_list = np.asarray(gridded_targetsnorm_list)
+
+griddednorm_mean=np.zeros((len(gridded_targetsnorm_list),10))
+for i in range(len(gridded_targetsnorm_list)):
+    # for j in range(10):
+    griddednorm_mean[i] = np.mean(gridded_targetsnorm_list[i],axis=0)
+
+#find the cells with no paths (nans)
+nan_ind=np.argwhere(np.isnan(griddednorm_mean)).flatten()
+# set nan elements for empty array
+for i in nan_ind:
+    griddednorm_mean[i] = 0
+    
+gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evlat, sitelon, sitelat, folder_path + 'testgrid/')
+
+#%%
+#test predictions
 
 # period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 

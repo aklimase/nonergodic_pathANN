@@ -79,6 +79,7 @@ def obs_pre(y_train, y_test, pre, pre_test, period, folder_path):
         plt.title('T ' + str(T) + ' s')
         plt.xlim(-1*lim, lim)
         plt.ylim(-1*lim, lim)
+        plt.legend()
         plt.savefig(folder_path + 'obs_pre_T_' + str(T) + '.png')
         plt.show()
     plt.close('all')
