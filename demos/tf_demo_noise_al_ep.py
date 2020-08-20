@@ -12,7 +12,6 @@ optimize kernel
 """
 
 
-
 from pprint import pprint
 from typing import Optional, Tuple
 

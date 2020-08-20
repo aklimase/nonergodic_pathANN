@@ -10,6 +10,11 @@ build a model that takes cybershake data, input to 12 feature ANN,input those re
 
 use spatial kernel in second model
 """
+import sys
+import os
+sys.path.append(os.path.abspath('/Users/aklimasewski/Documents/nonergodic_ANN'))
+from preprocessing import transform_dip, readindata, transform_data
+
 from preprocessing import transform_dip, readindata, transform_data
 from pprint import pprint
 import matplotlib.pyplot as plt
@@ -20,6 +25,8 @@ from tensorflow import random
 random.set_seed(1)
 from sklearn.preprocessing import PowerTransformer
 from sklearn.preprocessing import Normalizer
+from sklearn.preprocessing import StandardScaler
+
 from keras import layers
 from keras import optimizers
 # import gc
@@ -30,6 +37,7 @@ import os
 import cartopy
 import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
+# import tensorflow as tf
 import tensorflow_probability as tfp
 
 # For numeric stability, set the default floating-point dtype to float64
@@ -46,8 +54,8 @@ tfb = tfp.bijectors
 tfk = tfp.math.psd_kernels
 
 #%%
-
-folder_path = '/Users/aklimasewski/Documents/2step_ANN/model12/'
+topdir = '/Users/aklimase/Documents/USGS/'
+folder_path = topdir + 'models/2step_ANN/model12/'
 
 if not os.path.exists(folder_path):
     os.makedirs(folder_path)
@@ -57,7 +65,7 @@ epochs = 15
 batch_size = 264
 
 
-train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n=12)
+train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain= topdir + 'data/cybertrainyeti10_residfeb.csv', nametest=topdir + 'data/cybertestyeti10_residfeb.csv', n=12)
 x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path)
 
 
@@ -99,15 +107,13 @@ plt.grid()
 plt.savefig(folder_path + 'error1.png')
 plt.show()
 
-
-
 p = np.array(model.predict(x_test))
 predict_mean= p
     
 p = np.array(model.predict(x_train))
 predict_mean_train = p
 
-   #test data
+#test data
 mean_x_test_allT = np.mean(predict_mean, axis = 0)
 predict_epistemic_allT = np.std(predict_mean, axis = 0)
 
@@ -157,25 +163,31 @@ file.write('stddev test' + str(difftest) + '\n')
 file.close()
 
 #new targets
+#predictions
 resid_test = predict_mean
 resid_train  = predict_mean_train
 
+#residuals
+resid_test = y_test-mean_x_test_allT
+resid_train = y_train-mean_x_train_allT
 #%%
-transform_method = Normalizer()
+transform_method =  StandardScaler()
 epochs = 15
 batch_size = 264
-folder_path = '/Users/aklimasewski/Documents/2step_ANN/model4/'
+folder_path = topdir + 'models/2step_ANN/model4_residuals/'
 if not os.path.exists(folder_path):
     os.makedirs(folder_path)
 
 
-train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n=4)
+train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain=topdir + 'data/cybertrainyeti10_residfeb.csv', nametest=topdir + 'data/cybertestyeti10_residfeb.csv', n=4)
+#redefine targets
 x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw  = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path)
 
 def build_model():
     #model=models.Sequential()
     model = Sequential()
     model.add(layers.Dense(x_train.shape[1],activation='sigmoid', input_shape=(x_train.shape[1],)))
+    # model.add(RBFLayer(10, 2))
 
     #no gP layer
     model.add(layers.Dense(resid_train.shape[1]))
@@ -184,10 +196,7 @@ def build_model():
     #model.compile(optimizer='adam',loss='mse',metrics=['mae']) 
     return model
 
-
 model=build_model()
-
-
 
 #fit the model
 history=model.fit(x_train,resid_train,validation_data=(x_test,resid_test),epochs=epochs,batch_size=batch_size,verbose=1)
@@ -211,15 +220,13 @@ plt.savefig(folder_path + 'error_2.png')
 plt.show()
 
 
-
-
 p = np.array(model.predict(x_test))
 predict_mean2= p
     
 p = np.array(model.predict(x_train))
 predict_mean_train2 = p
 
-   #test data
+#test data
 mean_x_test_allT = np.mean(predict_mean2, axis = 0)
 predict_epistemic_allT = np.std(predict_mean2, axis = 0)
 
@@ -274,80 +281,30 @@ file.close()
 
 
 #%%
+from keras.layers import Layer
+from keras import backend as K
 
+class RBFLayer(Layer):
 
+    def __init__(self, units, gamma, **kwargs):
+        super(RBFLayer, self).__init__(**kwargs)
+        self.units = units
+        self.gamma = K.cast_to_floatx(gamma)
 
-def Optimize_kernelparams(train_data1):
-    
-    #kernel optimization
-    #to speed up, try randomly picking 1000 training samples
-    num_kernelopt_samples = 500
-    rand_ind= np.random.randint(0,len(train_data1),num_kernelopt_samples )
-    observed_index_points = train_data1[rand_ind]
-    observed_values = train_targets1[rand_ind].T
-    
-    
-    
-    kernel = tfp.math.psd_kernels.MaternOneHalf(
-        amplitude=tf.Variable(tf.ones(10,dtype=np.float64), dtype=np.float64, name='amplitude'),
-        length_scale=tf.Variable(tf.ones(10,dtype=np.float64), dtype=np.float64, name='length_scale'))
-    
-    gp = tfd.GaussianProcess(kernel, observed_index_points)
-    
-    optimizer = tf.optimizers.Adam()
+    def build(self, input_shape):
+#         print(input_shape)
+#         print(self.units)
+        self.mu = self.add_weight(name='mu',
+                                  shape=(int(input_shape[1]), self.units),
+                                  initializer='uniform',
+                                  trainable=True)
+        super(RBFLayer, self).build(input_shape)
 
-    @tf.function
-    def optimize():
-      with tf.GradientTape() as tape:
-        loss = -gp.log_prob(observed_values)
-      grads = tape.gradient(loss, gp.trainable_variables)
-      optimizer.apply_gradients(zip(grads, gp.trainable_variables))
-      return loss
-    
-    
-    for i in range(500):
-      neg_log_likelihood = optimize()
-      if i % 100 == 0:
-        print("Step {}: NLL = {}".format(i, neg_log_likelihood))
-    print("Final NLL = {}".format(neg_log_likelihood))
-    
-    #set amp and length for rbf function
-    print(gp.trainable_variables)
-    amplitude_opt,length_scale_opt = gp.trainable_variables
-    amplitude_opt = amplitude_opt.numpy()
-    length_scale_opt = length_scale_opt.numpy()
-    
-    return amplitude_opt,length_scale_opt
+    def call(self, inputs):
+        diff = K.expand_dims(inputs) - self.mu
+        l2 = K.sum(K.pow(diff, 2), axis=1)
+        res = K.exp(-1 * self.gamma * l2)
+        return res
 
-amplitude_opt,length_scale_opt = Optimize_kernelparams(train_data1)
-
-class RBFKernelFn_opt(tf.keras.layers.Layer):
-  def __init__(self, **kwargs):
-    super(RBFKernelFn_opt, self).__init__(**kwargs)
-    dtype = kwargs.get('dtype', None)
-
-    self._amplitude = self.add_variable(
-            initializer=tf.constant_initializer(0),
-            dtype=dtype,
-            name='amplitude')
-    
-    self._length_scale = self.add_variable(
-            # initializer=tf.keras.initializers(tf.constant([0.0,0.0,0.0,0.0,0.0])),
-            initializer=tf.constant_initializer(0),
-            dtype=dtype,
-            name='length_scale')
-
-  def call(self, x):
-    # Never called -- this is just a layer so it can hold variables
-    # in a way Keras understands.
-    return x
-
-  @property
-  def kernel(self):
-    return tfp.math.psd_kernels.MaternFiveHalves(
-      # amplitude=tf.nn.softplus([0.1,0.1,0.1,0.1,0.1] * self._amplitude),
-      # length_scale=tf.nn.softplus([1.0,1.0,1.0,1.0,1.0] * self._length_scale), feature_ndims=5
-      amplitude=(tf.nn.softplus(amplitude_opt* self._amplitude)),
-      length_scale=(tf.nn.softplus(length_scale_opt* self._length_scale)))
-
-
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], self.units)

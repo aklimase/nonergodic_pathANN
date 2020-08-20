@@ -4,6 +4,9 @@
 Created on Tue Jun 23 15:30:26 2020
 
 @author: aklimase
+
+from Kyle's ergodic reference models
+4 base models
 """
 
 from openquake.hazardlib.gsim import base
@@ -24,7 +27,6 @@ dftrain = pd.read_pickle(nametrain)
 dftest = pd.read_pickle(nametest)
 print(dftrain.shape)
 print(dftest.shape)
-
 
 
 ####
@@ -135,11 +137,4 @@ for i in range(ztest.shape[0]):
         gmpeASKstd[i,ii]=g[0][0]
 
 
-
-
-
-
-# def create_ANN():
-    
-    
 
