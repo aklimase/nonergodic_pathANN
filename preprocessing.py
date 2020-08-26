@@ -151,16 +151,63 @@ def readindata(nametrain, nametest, n):
 
         feature_names=np.asarray(['Mw','Rrup','Vs30', 'Z1.0', 'Z2.5', 'Rake','Dip','Hypo_depth', 'Width',
                 'Rjb','Rx','Ztor','xi',])
-    # elif n==16:
-    #     train_data1 = np.column_stack([Mwtrain,distrain,vs30train,z10train,z25train,raketrain,diptrain,hypodepthtrain, widthtrain,
-    #                             rjbtrain,rxtrain,startdepthtrain, xitrain, ])
-    #     test_data1 = np.column_stack([Mwtest,distest,vs30test,z10test,z25test,raketest,diptest, hypodepthtest, widthtest,
-    #                           rjbtest,rxtest,startdepthtest, xitest])
 
-    #     feature_names=np.asarray(['Mw','Rrup','Vs30', 'Z1.0', 'Z2.5', 'Rake','Dip','Hypo_depth', 'Width',
-    #             'Rjb','Rx','Ztor','xi',])
 
     return train_data1, test_data1, train_targets1, test_targets1, feature_names
+
+
+
+def add_locfeat(train_data1,test_data1, feature_names):
+    #calculats forward azimuth between event and station and adds to training and testing data
+    import numpy as np
+    
+    train_data1_4, test_data1_4, train_targets1_4, test_targets1_4, feature_names_4 = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = 4)
+    train_data1 = np.concatenate([train_data1,train_data1_4], axis = 1)
+    test_data1 = np.concatenate([test_data1,test_data1_4], axis = 1)
+    feature_names = np.concatenate([feature_names,feature_names_4], axis = 0)
+    
+    return train_data1, test_data1, feature_names
+
+
+
+#add aziumth
+def add_az(train_data1,test_data1, feature_names):
+    #calculats forward azimuth between event and station and adds to training and testing data
+    import pyproj
+    import numpy as np
+    
+    geodesic = pyproj.Geod(ellps='WGS84')
+    
+    train_data1_4, test_data1_4, train_targets1_4, test_targets1_4, feature_names_4 = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = 4)
+    
+    #station lat lon and event lat lon
+    az12,az21,distance = geodesic.inv(train_data1_4[:,3],train_data1_4[:,2],train_data1_4[:,1],train_data1_4[:,0])
+    az12_test,az21_test,distance_test = geodesic.inv(test_data1_4[:,3],test_data1_4[:,2],test_data1_4[:,1],test_data1_4[:,0])
+
+
+    #add the path features
+    train_data1 = np.concatenate([train_data1,az12.reshape(len(az12),1)], axis = 1)
+    test_data1 = np.concatenate([test_data1,az12_test.reshape(len(az12_test),1)], axis = 1)
+    feature_names = np.concatenate([feature_names,np.asarray(['forward_az'])], axis = 0)
+    
+    return train_data1, test_data1, feature_names
+
+def add_midpoint(train_data1,test_data1, feature_names):
+    #calculated midpoint lat, lon between event and station and adds to training and testing data
+    import numpy as np
+    
+    train_data1_4, test_data1_4, train_targets1_4, test_targets1_4, feature_names_4 = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = 4)
+    
+    #station lat lon and event lat lon
+    midpoint = np.asarray([(train_data1_4[:,0]+train_data1_4[:,2])/2.,(train_data1_4[:,1]+train_data1_4[:,3])/2.]).T
+    midpoint_test = np.asarray([(test_data1_4[:,0]+test_data1_4[:,2])/2.,(test_data1_4[:,1]+test_data1_4[:,3])/2.]).T
+
+    #add the path features
+    train_data1 = np.concatenate([train_data1,midpoint], axis = 1)
+    test_data1 = np.concatenate([test_data1,midpoint_test], axis = 1)
+    feature_names = np.concatenate([feature_names,np.asarray(['midpointlat','midpointlon'])], axis = 0)
+    
+    return train_data1, test_data1, feature_names
 
 
 def transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path):
@@ -228,117 +275,117 @@ def transform_data(transform_method, train_data1, test_data1, train_targets1, te
     return(x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw)
 
 
-def create_grid(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.05):
-    '''
-    Parameters
-    ----------
-    latmin: float minimum value of grid latitude, default 32 N
-    latmax: float maximum value of grid latitude, default 37.5 N
-    lonmin: float minimum value of grid longitude, default -121 W
-    lonmax: float maximum value of grid longitude, default -115.5 W
-    dx: float grid spacing in degrees default is 0.05.
+# def create_grid(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.05):
+#     '''
+#     Parameters
+#     ----------
+#     latmin: float minimum value of grid latitude, default 32 N
+#     latmax: float maximum value of grid latitude, default 37.5 N
+#     lonmin: float minimum value of grid longitude, default -121 W
+#     lonmax: float maximum value of grid longitude, default -115.5 W
+#     dx: float grid spacing in degrees default is 0.05.
 
-    Returns
-    df: pandas dataframe of shapely polgons and midpoint of each grid cell in lat, lon
-    lon: 1D numpy array of longitude grid vertices
-    lat: 1D numpy array of latitude grid vertices
-    '''
+#     Returns
+#     df: pandas dataframe of shapely polgons and midpoint of each grid cell in lat, lon
+#     lon: 1D numpy array of longitude grid vertices
+#     lat: 1D numpy array of latitude grid vertices
+#     '''
 
-    import numpy as np
-    import shapely
-    import shapely.geometry
-    import pandas as pd
+#     import numpy as np
+#     import shapely
+#     import shapely.geometry
+#     import pandas as pd
     
-    # dx=0.1
-    lon = np.arange(-121,-115.5, dx)
-    lat = np.arange(32, 37.5, dx)
+#     # dx=0.1
+#     lon = np.arange(-121,-115.5, dx)
+#     lat = np.arange(32, 37.5, dx)
     
-    latmid = []
-    lonmid = []
-    polygons = []
-    for i in range(len(lon)-1):
-        for j in range(len(lat)-1):
-            polygon_points = [(lon[i], lat[j]), (lon[i], lat[j+1]), (lon[i+1], lat[j+1]), (lon[i+1], lat[j]), (lon[i], lat[j])]
-            shapely_poly = shapely.geometry.Polygon(polygon_points)
-            polygons.append(shapely_poly)
-            latmid.append((lat[j]+lat[j+1])/2.)
-            lonmid.append((lon[i]+lon[i+1])/2.)
+#     latmid = []
+#     lonmid = []
+#     polygons = []
+#     for i in range(len(lon)-1):
+#         for j in range(len(lat)-1):
+#             polygon_points = [(lon[i], lat[j]), (lon[i], lat[j+1]), (lon[i+1], lat[j+1]), (lon[i+1], lat[j]), (lon[i], lat[j])]
+#             shapely_poly = shapely.geometry.Polygon(polygon_points)
+#             polygons.append(shapely_poly)
+#             latmid.append((lat[j]+lat[j+1])/2.)
+#             lonmid.append((lon[i]+lon[i+1])/2.)
                
-    d = {'polygon': polygons, 'latmid': latmid, 'lonmid': lonmid}
-    df = pd.DataFrame(data=d)    
-    return df, lon, lat
+#     d = {'polygon': polygons, 'latmid': latmid, 'lonmid': lonmid}
+#     df = pd.DataFrame(data=d)    
+#     return df, lon, lat
     
-def grid_data(train_data1, train_targets1, df, nsamples = 5000):
-    '''
-    Parameters
-    ----------
-    train_data1: numpy array of training data for gridding
-    train_targets1: numpy array of testing targets for gridding
-    df: pandas dataframe of shapely polgons and midpoint of each grid cell in lat, lon
-    nsamples: number of samples to randomly choose (for fast testing)
+# def grid_data(train_data1, train_targets1, df):
+#     '''
+#     Parameters
+#     ----------
+#     train_data1: numpy array of training data for gridding
+#     train_targets1: numpy array of testing targets for gridding
+#     df: pandas dataframe of shapely polgons and midpoint of each grid cell in lat, lon
+#     nsamples: number of samples to randomly choose (for fast testing)
     
-    Returns
-    hypoR: numpy array of hypocentral distance for sample
-    sitelat: numpy array of site latitude for sample
-    sitelon: numpy array of site longitude for sample
-    evlat: numpy array of event latitude for sample
-    evlon: numpy array of event longitude for sample
-    target: numpy array of targets for sample
-    gridded_targetsnorm_list: 2D list of targets normalized by path length and multiplied by distance per cell
-    gridded_counts: 2D list of path counts per grid cell
-    '''
-    import shapely
-    import shapely.geometry
-    import numpy as np
-    import geopy
-    import random
-    import geopy.distance
+#     Returns
+#     hypoR: numpy array of hypocentral distance for sample
+#     sitelat: numpy array of site latitude for sample
+#     sitelon: numpy array of site longitude for sample
+#     evlat: numpy array of event latitude for sample
+#     evlon: numpy array of event longitude for sample
+#     target: numpy array of targets for sample
+#     gridded_targetsnorm_list: 2D list of targets normalized by path length and multiplied by distance per cell
+#     gridded_counts: 2D list of path counts per grid cell
+#     '''
+#     import shapely
+#     import shapely.geometry
+#     import numpy as np
+#     import geopy
+#     import random
+#     import geopy.distance
 
     
-    # randindex = random.sample(range(0, len(train_data1)), nsamples)
+#     # randindex = random.sample(range(0, len(train_data1)), nsamples)
     
-    # hypoR = train_data1[:,0][randindex]
-    # sitelat = train_data1[:,1][randindex]
-    # sitelon = train_data1[:,2][randindex]
-    # evlat = train_data1[:,3][randindex]
-    # evlon = train_data1[:,4][randindex]
-    # target = train_targets1[:][randindex]
+#     # hypoR = train_data1[:,0][randindex]
+#     # sitelat = train_data1[:,1][randindex]
+#     # sitelon = train_data1[:,2][randindex]
+#     # evlat = train_data1[:,3][randindex]
+#     # evlon = train_data1[:,4][randindex]
+#     # target = train_targets1[:][randindex]
     
     
-    hypoR = train_data1[:,0]
-    sitelat = train_data1[:,1]
-    sitelon = train_data1[:,2]
-    evlat = train_data1[:,3]
-    evlon = train_data1[:,4]
-    target = train_targets1[:]
+#     hypoR = train_data1[:,0]
+#     sitelat = train_data1[:,1]
+#     sitelon = train_data1[:,2]
+#     evlat = train_data1[:,3]
+#     evlon = train_data1[:,4]
+#     target = train_targets1[:]
     
-    normtarget = target / hypoR[:, np.newaxis]
-    gridded_targetsnorm_list = [ [] for _ in range(df.shape[0]) ]
+#     normtarget = target / hypoR[:, np.newaxis]
+#     gridded_targetsnorm_list = [ [] for _ in range(df.shape[0]) ]
     
-    gridded_counts = np.zeros(df.shape[0])
-    lenlist = []
+#     gridded_counts = np.zeros(df.shape[0])
+#     lenlist = []
     
-    #loop through each record     
-    for i in range(len(sitelat)):                       
-        line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
-        path=shapely.geometry.LineString(line)
-        #loop through each grid cell
-        if (i % 1000) == 0:
-        	print('record: ', str(i))
-        for j in range(len(df)):
-            shapely_poly = df['polygon'][j]
-            if path.intersects(shapely_poly) == True:
-                shapely_line = shapely.geometry.LineString(line)
-                intersection_line = list(shapely_poly.intersection(shapely_line).coords)
-                if len(intersection_line)== 2:
-                    coords_1 = (intersection_line[0][1], intersection_line[0][0])
-                    coords_2 = (intersection_line[1][1], intersection_line[1][0])
-                    length=geopy.distance.distance(coords_1, coords_2).km
-                    gridded_targetsnorm_list[j].append(normtarget[i]*length)          
-                    gridded_counts[j] += 1
-                    lenlist.append(length)
+#     #loop through each record     
+#     for i in range(len(sitelat)):                       
+#         line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
+#         path=shapely.geometry.LineString(line)
+#         #loop through each grid cell
+#         if (i % 1000) == 0:
+#         	print('record: ', str(i))
+#         for j in range(len(df)):
+#             shapely_poly = df['polygon'][j]
+#             if path.intersects(shapely_poly) == True:
+#                 shapely_line = shapely.geometry.LineString(line)
+#                 intersection_line = list(shapely_poly.intersection(shapely_line).coords)
+#                 if len(intersection_line)== 2:
+#                     coords_1 = (intersection_line[0][1], intersection_line[0][0])
+#                     coords_2 = (intersection_line[1][1], intersection_line[1][0])
+#                     length=geopy.distance.distance(coords_1, coords_2).km
+#                     gridded_targetsnorm_list[j].append(normtarget[i]*length)          
+#                     gridded_counts[j] += 1
+#                     lenlist.append(length)
                 
-    return hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts
+#     return hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts
     
 
 

@@ -39,7 +39,7 @@ def plot_resid(resid, resid_test, folder_path):
     plt.xlabel('Period')
     plt.ylabel('Total Standard Deviation')
     plt.legend()
-    plt.ylim(.3,.85)
+    plt.ylim(.25,.85)
     plt.savefig(folder_path + 'resid_T.png')
     plt.show()
     
@@ -87,79 +87,79 @@ def obs_pre(y_train, y_test, pre, pre_test, period, folder_path):
 
     
     
-def gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evlat, sitelon, sitelat, folder_path):
-    '''
-    Parameters
-    ----------
-    griddednorm_mean: 2D list of gridded normalized residuals
-    gridded_counts: 2D list of path counts per cell
-    period:
-    lat: list of grid cell latitudes
-    lon: list of gtrid cell longitudes
-    evlon: 
-    evlat
-    sitelon
-    sitelat
-    folder_path
-    '''
-    import numpy as np
-    import matplotlib as mpl
-    import matplotlib.pyplot as plt
+# def gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evlat, sitelon, sitelat, folder_path):
+#     '''
+#     Parameters
+#     ----------
+#     griddednorm_mean: 2D list of gridded normalized residuals
+#     gridded_counts: 2D list of path counts per cell
+#     period:
+#     lat: list of grid cell latitudes
+#     lon: list of gtrid cell longitudes
+#     evlon: 
+#     evlat
+#     sitelon
+#     sitelat
+#     folder_path
+#     '''
+#     import numpy as np
+#     import matplotlib as mpl
+#     import matplotlib.pyplot as plt
     
-    for i in range(len(griddednorm_mean.T)):
-        T = period[i]
-        g = griddednorm_mean.T[i]
-        Z = g.reshape(len(lat)-1,len(lon)-1)
+#     for i in range(len(griddednorm_mean.T)):
+#         T = period[i]
+#         g = griddednorm_mean.T[i]
+#         Z = g.reshape(len(lat)-1,len(lon)-1)
         
-        cbound = max(np.abs(g))
-        cbound = 0.12
+#         cbound = max(np.abs(g))
+#         cbound = 0.12
     
-        cmap = mpl.cm.get_cmap('seismic')
-        normalize = mpl.colors.Normalize(vmin=-1*cbound, vmax=cbound)
-        colors = [cmap(normalize(value)) for value in Z]
-        s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
-        s_m.set_array([])
+#         cmap = mpl.cm.get_cmap('seismic')
+#         normalize = mpl.colors.Normalize(vmin=-1*cbound, vmax=cbound)
+#         colors = [cmap(normalize(value)) for value in Z]
+#         s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
+#         s_m.set_array([])
             
-        fig, ax = plt.subplots(figsize = (10,8))
-        plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
-        plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
-        plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
-        plt.xlim(min(lon),max(lon))
-        plt.ylim(min(lat),max(lat))
-        plt.title('T ' + str(T) + ' s')
-        plt.legend(loc = 'lower left')
+#         fig, ax = plt.subplots(figsize = (10,8))
+#         plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
+#         plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
+#         plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
+#         plt.xlim(min(lon),max(lon))
+#         plt.ylim(min(lat),max(lat))
+#         plt.title('T ' + str(T) + ' s')
+#         plt.legend(loc = 'lower left')
         
-        fig.subplots_adjust(right=0.75)
-        cbar = plt.colorbar(s_m, orientation='vertical')
-        cbar.set_label(r'average normalized residual (resid/km)', fontsize = 20)
-        plt.savefig(folder_path + 'normresid_T_' + str(T) + '.png')
-        plt.show()
+#         fig.subplots_adjust(right=0.75)
+#         cbar = plt.colorbar(s_m, orientation='vertical')
+#         cbar.set_label(r'average normalized residual (resid/km)', fontsize = 20)
+#         plt.savefig(folder_path + 'normresid_T_' + str(T) + '.png')
+#         plt.show()
     
-    # counts
-    Z = gridded_counts.reshape(len(lat)-1,len(lon)-1)
+#     # counts
+#     Z = gridded_counts.reshape(len(lat)-1,len(lon)-1)
     
-    cbound = max(np.abs(gridded_counts))
-    cmap = mpl.cm.get_cmap('Greens')
-    normalize = mpl.colors.Normalize(vmin=0, vmax=cbound)
-    colors = [cmap(normalize(value)) for value in Z]
-    s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
-    s_m.set_array([])
+#     cbound = max(np.abs(gridded_counts))
+#     cmap = mpl.cm.get_cmap('Greens')
+#     normalize = mpl.colors.Normalize(vmin=0, vmax=cbound)
+#     colors = [cmap(normalize(value)) for value in Z]
+#     s_m = mpl.cm.ScalarMappable(cmap = cmap, norm=normalize)
+#     s_m.set_array([])
     
-    fig, ax = plt.subplots(figsize = (10,8))
-    plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
-    plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
-    plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
-    plt.xlim(min(lon),max(lon))
-    plt.ylim(min(lat),max(lat))
-    plt.title('T ' + str(T) + ' s')
-    plt.legend(loc = 'lower left')
+#     fig, ax = plt.subplots(figsize = (10,8))
+#     plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
+#     plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
+#     plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
+#     plt.xlim(min(lon),max(lon))
+#     plt.ylim(min(lat),max(lat))
+#     plt.title('T ' + str(T) + ' s')
+#     plt.legend(loc = 'lower left')
     
-    fig.subplots_adjust(right=0.75)
-    cbar = plt.colorbar(s_m, orientation='vertical')
-    cbar.set_label(r'paths per cell', fontsize = 20)
-    plt.savefig(folder_path + 'pathcounts.png')
-    plt.show()
-    plt.close('all')
+#     fig.subplots_adjust(right=0.75)
+#     cbar = plt.colorbar(s_m, orientation='vertical')
+#     cbar.set_label(r'paths per cell', fontsize = 20)
+#     plt.savefig(folder_path + 'pathcounts.png')
+#     plt.show()
+#     plt.close('all')
 
 def plot_rawinputs(x_raw, mean_x_allT, y, feature_names, period, folder_path):
     import matplotlib.pyplot as plt
