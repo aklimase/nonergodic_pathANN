@@ -1,0 +1,422 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Aug 30 14:36:28 2020
+
+@author: aklimasewski
+"""
+
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar 21 11:19:06 2019
+
+@author: kwithers
+"""
+import matplotlib.pyplot as plt
+import numpy as np
+plt.close('all')
+
+from numpy.random import seed
+seed(1)
+from tensorflow import set_random_seed
+set_random_seed(2)
+
+from numpy.random import seed
+seed(1)
+from tensorflow import set_random_seed
+import pandas as pd
+set_random_seed(2)
+
+
+period=[10,7.5,5,3,2,1]
+period=np.array(period)
+
+
+tempvs30 = np.loadtxt('/Users/kwithers/march/peertempvs30all.txt')
+tempz10 = np.loadtxt('/Users/kwithers/march/peertempz10all.txt')
+tempz25 = np.loadtxt('/Users/kwithers/march/peertempz25all.txt')
+siteperiod = np.loadtxt('/Users/kwithers/march/peersiteperiodall.txt')
+
+
+df = pd.read_csv('/Users/kwithers/march/Updated_NGA_West2_Flatfile_RotD50_d050_public_version.csv')
+df1 = pd.read_csv('/Users/kwithers/march/RecSeqNum_TableToExcel.csv')
+df=df.merge(df1, left_on='Record Sequence Number', right_on='RecSeqNum')
+ 
+ 
+Mwtest=df["Earthquake Magnitude"]
+distest=df["ClstD (km)"]
+vs30test=df["Vs30 (m/s) selected for analysis"]
+#pause
+
+z1test=df["Northern CA/Southern CA - S4 Z1 (m)"]
+z2p5test=df["Northern CA/Southern CA - S4 Z2.5 (m)"]
+
+azi=df["Source to Site Azimuth (deg)"]
+
+staLattest=df["Station Latitude"]
+staLontest=df["Station Longitude"]
+
+rake=df["Rake Angle (deg)"]
+dip=df["Dip (deg)"]
+strike=df["Strike (deg)"]
+hypodepth=df["Hypocenter Depth (km)"]
+hypolattest=df["Hypocenter Latitude (deg)"]
+hypolontest=df["Hypocenter Longitude (deg)"]
+width=df["Fault Rupture Width (km)"]
+
+length=df["Fault Rupture Area (km^2)"]/width
+rjb=df["Joyner-Boore Dist. (km)"]
+rx=df["Rx"]
+ry=df["Ry 2"]
+#ry=np.abs(ry)
+hypodis =df["HypD (km)"]
+depthtotop=df["Depth to Top Of Fault Rupture Model"]
+
+# b6=df["dist_z1pt0_500m"]
+U=df["U"]
+T=df["T"]
+
+lus1=df["Lowest Usable Freq - H1 (Hz)"]
+lus2=df["Lowest Usable Freq - H2 (H2)"]
+mm=np.max([lus1,lus2],axis=0)
+mmt=1./mm
+#XCI	XCI1
+xi=df["XCI"]
+# b1=df["dist_z1pt0_50m"]
+# b2=df["dist_z1pt0_100m"]
+# b3=df["dist_z1pt0_200m"]
+# b4=df["dist_z1pt0_300m"]
+# b5=df["dist_z1pt0_400m"]
+# b6=df["dist_z1pt0_500m"]
+
+
+#
+residtesttemp=df.loc[:, 'T0.100S':'T20.000S']
+residtest=(residtesttemp.values)
+
+#period=[10,7.5,5, 3,2,1]
+
+residtest=residtest[:,[78,73, 68,  57, 51, 41]]/100
+
+#pause
+feature_names=['Mw','dis','vs30', 'z10', 'z25', 'raketest','diptest','strike', 'hypodepth', 'lattest', 'longtest','hypolattest','hypolontest','width']
+              
+               
+
+rxkeep=rx
+dip=np.array(dip)
+rx=np.array(rx)
+rec1=-1
+for ij in dip:
+    rec1=rec1+1
+    if dip[rec1]>30:
+        rx[rec1]=rx[rec1]*(90-dip[rec1])/45
+    else:
+        rx[rec1]=rx[rec1]*60/45
+
+
+
+#U=ry
+#T=ry
+ztest = np.column_stack([Mwtest,distest,vs30test,z1test,z2p5test,mmt
+                         , rake,dip,hypodepth
+                         ,width, rjb, rx,depthtotop,  staLattest,staLontest,hypolattest,hypolontest,rxkeep          ])
+    
+
+
+
+print(ztest.shape)
+
+feature_names=['Mwtest','vs30test','R_rup', 'ztt', 'strike','Mwtest*Mwtest','np.log(distest)','np.sqrt(ztt*ztt+distest*distest)',
+               'Hypocenter Depth (km)','Fault Rupture Length for Calculation of Ry (km)',
+               'Fault Rupture Width (km)','Fault Rupture Area (km^2)',
+               'EpiD (km)','HypD (km)','Rx', 'Dip','Mechanism Based on Rake Angle',
+               'b1','z1test', 'z2p5test',
+               'mm','ID','staLontest','staLattest', 'b2','b3','b4','b5','b6' ]
+
+
+
+#Mw=5.96-8.45
+#dis= max of 200
+#vs30=500-710
+#z10max=900
+#z25max=5350
+#lat= 33.45402,35.21083
+#long=-120.8561,   -116.4977
+#'aziumuthtest',
+#vall=19+1
+
+for i in range(0,4+1):
+    index=(ztest[:,i]>-200)
+    ztest=ztest[index]
+    print(ztest.shape)
+    residtest=residtest[index]
+    print (i,ztest.shape,i)
+
+
+#pause
+
+#first SA values greater than 0
+index=(residtest[:,0]>0.0)
+ztest=ztest[index]
+residtest=residtest[index]
+print(ztest.shape,6)
+
+#seconds SA values greater than 0
+index=(residtest[:,1]>0.0)
+ztest=ztest[index]
+residtest=residtest[index]
+print(ztest.shape,7)
+
+#added magnitude above 5.9 here
+index=(ztest[:,0]>2.9)
+ztest=ztest[index]
+residtest=residtest[index]
+print(ztest.shape,7)
+
+
+#distance max of 200km
+index=(ztest[:,2]>300)
+ztest=ztest[index]
+residtest=residtest[index]
+print(ztest.shape,7)
+##########################################
+
+residtest=np.log(980*residtest)
+#staLon	staLat
+#-118.642	 34.564
+#-117.312	 34.059
+
+#index=(ztest[:,0]>5.96)
+#ztest=ztest[index]
+#residtest=residtest[index]
+#print(ztest.shape,8)
+
+#distance
+index=(ztest[:,1]<200)
+ztest=ztest[index]
+residtest=residtest[index]
+print(ztest.shape,9)
+
+
+
+ppp=ztest[:,5]
+
+ztest1=ztest
+ztest1=np.delete(ztest1,[5],1)
+
+ztest=ztest1
+
+
+rxkeep=ztest[:,-1]    
+ztest=np.delete(ztest,-1,1)
+
+
+
+
+
+
+#ztest=np.delete(ztest,-1,1)
+
+
+
+
+for k in range(residtest.shape[0]):
+    indices = [i for i,v in enumerate(period >= ppp[k]) if v]
+    #residtest[k,indices]=np.NaN
+nonnan=np.zeros(residtest.shape[1])
+
+for k in range(residtest.shape[1]):  
+    nonnan[k]=np.count_nonzero(~np.isnan(residtest[:,k]))
+ 
+    
+#plt.subplots(figsize=(10,10))
+#%matplotlib osx     
+f1=plt.figure('Records at frequency2',figsize=(5,5))
+plt.semilogx(period,nonnan)
+plt.xlabel('Period (s)')
+plt.ylabel('Count')
+plt.title('Number of Accurate Records (PEER)')
+plt.grid()
+
+#rake >5?
+index=(ztest[:,5]>5)
+ztest=ztest[index]
+residtest=residtest[index]
+print(ztest.shape,13)
+
+
+
+#pause
+
+
+
+#pause
+
+
+index=(ztest[:,13]>-120.8561)
+ztest=ztest[index]
+residtest=residtest[index]
+print(ztest.shape,14)
+
+index=(ztest[:,12]>33.45)
+ztest=ztest[index]
+residtest=residtest[index]
+print(ztest.shape,15)
+
+index=(ztest[:,12]<35.21)
+ztest=ztest[index]
+residtest=residtest[index]
+print(ztest.shape,16)
+
+index=(ztest[:,13]<-116.4977)
+ztest=ztest[index]
+residtest=residtest[index]
+print(ztest.shape,17)
+
+
+
+
+#pause
+ztest=np.delete(ztest,[15],1)
+ztest=np.delete(ztest,[14],1)
+ztest=np.delete(ztest,[13],1)
+ztest=np.delete(ztest,[12],1)
+
+
+
+
+from openquake.hazardlib.gsim import base
+import openquake.hazardlib.imt as imt
+from openquake.hazardlib.const import StdDev
+
+from openquake.hazardlib.gsim.abrahamson_2014 import AbrahamsonEtAl2014   #ASK
+from openquake.hazardlib.gsim.campbell_bozorgnia_2014 import CampbellBozorgnia2014  #CB
+from openquake.hazardlib.gsim.chiou_youngs_2014 import ChiouYoungs2014   #CY
+from openquake.hazardlib.gsim.boore_2014 import BooreEtAl2014   #BSSA 
+
+
+# Type of standard deviation
+stddev_types = [StdDev.TOTAL]
+
+# Instantiate the GMPE
+#gmpe = Atkinson2010Hawaii()
+gmpeASK = AbrahamsonEtAl2014()
+gmpeBSSA = BooreEtAl2014()
+gmpeCB= CampbellBozorgnia2014()
+gmpeCY = ChiouYoungs2014()
+
+
+#CY: z1.0 is in meters
+
+
+
+gmpeBSSAdata=np.zeros([ztest.shape[0],period.shape[0]])
+gmpeASKdata=np.zeros([ztest.shape[0],period.shape[0]])
+gmpeCBdata=np.zeros([ztest.shape[0],period.shape[0]])
+gmpeCYdata=np.zeros([ztest.shape[0],period.shape[0]])
+
+gmpeBSSAstd=np.zeros([ztest.shape[0],period.shape[0]])
+gmpeASKstd=np.zeros([ztest.shape[0],period.shape[0]])
+gmpeCBstd=np.zeros([ztest.shape[0],period.shape[0]])
+gmpeCYstd=np.zeros([ztest.shape[0],period.shape[0]])
+    ##ztest = np.column_stack([
+    #Mwtest: 0
+    #distest : 1
+    #vs30test: 2
+    #z1test : 3
+    #z2p5test: 4
+    #rake: 5
+    #dip : 6
+    #hypodepth : 7
+    #width : 8
+    #rjb: 9
+    #rx: 10
+    #depthtotop: 11
+    #ry : 12
+    
+for i in range(ztest.shape[0]):
+    
+        # Distance
+        
+    dx = base.DistancesContext()
+    dx.rjb=    np.array([ztest[i,9]])
+    
+    
+    
+    #dx.rjb = np.logspace(-1, 2, 10)
+    # Magnitude and rake
+    rx = base.RuptureContext()
+    rx.mag = np.array([ztest[i,0]])
+    rx.rake = np.array([ztest[i,5]])
+    rx.hypo_depth = np.array([ztest[i,7]])
+    # Vs30
+    sx = base.SitesContext()
+    sx.vs30 = np.array([ztest[i,2]])
+    sx.vs30measured = 0
+    
+    dx.rrup=np.array([ztest[i,1]])
+    rx.ztor=np.array([ztest[i,11]])
+    rx.dip=np.array([ztest[i,6]])
+    rx.width=np.array([ztest[i,8]])
+    dx.rx=np.array([rxkeep[i]])
+    dx.ry0=np.array([0])
+    sx.z1pt0= np.array([ztest[i,3]])
+    sx.z2pt5=np.array([ztest[i,4]])
+    
+    # Evaluate GMPE
+    #Unit of measure for Z1.0 is [m] (ASK)
+    #lmean, lsd = gmpeASK.get_mean_and_stddevs(sx, rx, dx, imt.PGV(), stddev_types)
+    
+    #for period1 in period:
+    for ii in range(0,6):
+        sx.vs30measured = 0
+        period1=period[ii]
+        gmpeBSSAdata[i,ii], g = gmpeBSSA.get_mean_and_stddevs(sx, rx, dx, imt.SA(period1), stddev_types)
+        gmpeBSSAstd[i,ii]=g[0][0]
+        
+        gmpeCBdata[i,ii], g = gmpeCB.get_mean_and_stddevs(sx, rx, dx, imt.SA(period1), stddev_types)
+        gmpeCBstd[i,ii]=g[0][0]
+        
+        gmpeCYdata[i,ii], g = gmpeCY.get_mean_and_stddevs(sx, rx, dx, imt.SA(period1), stddev_types)
+        gmpeCYstd[i,ii]=g[0][0]
+        
+        sx.vs30measured = [0]
+        gmpeASKdata[i,ii], g = gmpeASK.get_mean_and_stddevs(sx, rx, dx, imt.SA(period1), stddev_types)
+        gmpeASKstd[i,ii]=g[0][0]
+        
+        # lmean = log(mean)
+        # lsd = standard deviation in log space
+        #print(np.exp(lmean))
+        #print(lsd[0])
+    
+    
+#np.mean(gmpeBSSAstd,axis=0)
+
+rrrr=np.log((np.exp(gmpeBSSAdata)+np.exp(gmpeASKdata)+np.exp(gmpeCBdata)+np.exp(gmpeCYdata))/4*9.8)
+
+
+residtest=(residtest)-(rrrr)
+
+
+plt.close('all')
+plt.hist((residtest[:,5]),100)
+
+
+
+
+
+#random.seed( 30 )
+msk = np.random.rand(len(residtest)) < 0.85
+
+ztest1 = ztest[msk]
+ztest2 = ztest[~msk]
+
+residtest1=residtest[msk]
+residtest2=residtest[~msk]
+
+
+rrrr=rrrr[~msk]
+

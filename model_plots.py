@@ -6,7 +6,15 @@ Created on Wed Jul 29 08:51:16 2020
 @author: aklimase
 """
 
+import seaborn as sns; 
+sns.set(style="ticks", color_codes=True)
 
+# For numeric stability, set the default floating-point dtype to float64
+
+sns.reset_defaults()
+sns.set_style('whitegrid')
+sns.set_context('talk')
+sns.set_context(context='talk',font_scale=0.7)
 
 def plot_resid(resid, resid_test, folder_path):
     '''

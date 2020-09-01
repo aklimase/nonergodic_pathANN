@@ -56,7 +56,7 @@ sns.set_context(context='talk',font_scale=0.7)
 first ANN with the base model features
 '''
 topdir = '/Users/aklimasewski/Documents/'
-folder_path = topdir + 'models/2step_ANN/model13/'
+folder_path = topdir + 'model_results/2step_ANN/model13/'
 
 if not os.path.exists(folder_path):
     os.makedirs(folder_path)

@@ -52,6 +52,8 @@ gmpeASKdata=np.zeros([ztest.shape[0],period.shape[0]])
 gmpeASKstd=np.zeros([ztest.shape[0],period.shape[0]])
 
 
+
+
 Mwtest= dftest["Mag"]
 distest=dftest["Site_Rupture_Dist"]
 vs30test=np.array(dftest["vs30"])
@@ -123,18 +125,17 @@ for i in range(ztest.shape[0]):
     for ii in range(0,6):
         sx.vs30measured = 0
         period1=period[ii]
-        # gmpeBSSAdata[i,ii], g = gmpeBSSA.get_mean_and_stddevs(sx, rx, dx, imt.SA(period1), stddev_types)
-        # gmpeBSSAstd[i,ii]=g[0][0]
+        gmpeBSSAdata[i,ii], g = gmpeBSSA.get_mean_and_stddevs(sx, rx, dx, imt.SA(period1), stddev_types)
+        gmpeBSSAstd[i,ii]=g[0][0]
         
-        # gmpeCBdata[i,ii], g = gmpeCB.get_mean_and_stddevs(sx, rx, dx, imt.SA(period1), stddev_types)
-        # gmpeCBstd[i,ii]=g[0][0]
+        gmpeCBdata[i,ii], g = gmpeCB.get_mean_and_stddevs(sx, rx, dx, imt.SA(period1), stddev_types)
+        gmpeCBstd[i,ii]=g[0][0]
         
-        # gmpeCYdata[i,ii], g = gmpeCY.get_mean_and_stddevs(sx, rx, dx, imt.SA(period1), stddev_types)
-        # gmpeCYstd[i,ii]=g[0][0]
+        gmpeCYdata[i,ii], g = gmpeCY.get_mean_and_stddevs(sx, rx, dx, imt.SA(period1), stddev_types)
+        gmpeCYstd[i,ii]=g[0][0]
         
         sx.vs30measured = [0]
         gmpeASKdata[i,ii], g = gmpeASK.get_mean_and_stddevs(sx, rx, dx, imt.SA(period1), stddev_types)
         gmpeASKstd[i,ii]=g[0][0]
-
 
 

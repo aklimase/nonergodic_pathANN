@@ -32,8 +32,8 @@ def create_grid(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.05):
 
     
     # dx=0.1
-    lon = np.arange(lonmin, lonmax, dx)
-    lat = np.arange(latmin, latmax, dx)
+    lon = np.arange(lonmin, lonmax+dx, dx)
+    lat = np.arange(latmin, latmax+dx, dx)
     
     latmid = []
     lonmid = []
@@ -74,8 +74,8 @@ def create_grid_square(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.24, 
     import geopy.distance
     
     # dx=0.1
-    lon = np.arange(lonmin, lonmax, dx)
-    lat = np.arange(latmin, latmax, dy)
+    lon = np.arange(lonmin, lonmax+dx, dx)
+    lat = np.arange(latmin, latmax+dy, dy)
     
     latmidi = round(len(lat)/2.)
     lonmidi = round(len(lon)/2.)
@@ -181,7 +181,51 @@ def grid_data(train_data1, train_targets1, df):
 
 
 
-def mean_grid(gridded_targetsnorm_list,gridded_targetsnorm_list_test,gridded_counts,gridded_counts_test, df,folder_path):
+# def mean_grid_save(gridded_targetsnorm_list,gridded_counts,gridded_counts_test, df,folder_path,name):
+#     import numpy as np
+#     import pandas as pd
+    
+#     period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
+
+    
+#     #find mean of norm residual
+#     gridded_targetsnorm_list = np.asarray(gridded_targetsnorm_list)
+    
+#     griddednorm_mean=np.zeros((len(gridded_targetsnorm_list),10))
+#     for i in range(len(gridded_targetsnorm_list)):
+#         griddednorm_mean[i] = np.mean(gridded_targetsnorm_list[i],axis=0)
+    
+#     nan_ind=np.argwhere(np.isnan(griddednorm_mean)).flatten()
+#     for i in nan_ind:
+#         griddednorm_mean[i] = 0
+        
+#     gridded_targetsnorm_list_test = np.asarray(gridded_targetsnorm_list_test)
+    
+#     griddednorm_mean_test=np.zeros((len(gridded_targetsnorm_list_test),10))
+#     for i in range(len(gridded_targetsnorm_list_test)):
+#         griddednorm_mean_test[i] = np.mean(gridded_targetsnorm_list_test[i],axis=0)
+    
+#     #find the cells with no paths (nans)
+#     nan_ind=np.argwhere(np.isnan(griddednorm_mean_test)).flatten()
+#     for i in nan_ind:
+#         griddednorm_mean_test[i] = 0
+        
+#     df_save = df
+#     meandict = {'T' + str(period[i]): griddednorm_mean[:,i] for i in range(len(period))}
+#     meandict_test = {'T' + str(period[i]) + 'test': griddednorm_mean_test[:,i] for i in range(len(period))}
+#     d2 = {'griddedcounts': gridded_counts, 'griddedcountstest': gridded_counts_test}
+#     d2.update(meandict)
+#     d2.update(meandict_test)
+#     df2 = pd.DataFrame(data=d2)   
+#     # df_save.append(df2)
+#     df_save=pd.concat([df_save,df2],axis=1)
+#     df_save.to_csv(folder_path + 'griddedvalues.csv')
+    
+#     return griddednorm_mean, griddednorm_mean_test
+
+
+
+def mean_grid_save(gridded_targetsnorm_list,gridded_counts,df,folder_path,name):
     import numpy as np
     import pandas as pd
     
@@ -199,29 +243,19 @@ def mean_grid(gridded_targetsnorm_list,gridded_targetsnorm_list_test,gridded_cou
     for i in nan_ind:
         griddednorm_mean[i] = 0
         
-    gridded_targetsnorm_list_test = np.asarray(gridded_targetsnorm_list_test)
-    
-    griddednorm_mean_test=np.zeros((len(gridded_targetsnorm_list_test),10))
-    for i in range(len(gridded_targetsnorm_list_test)):
-        griddednorm_mean_test[i] = np.mean(gridded_targetsnorm_list_test[i],axis=0)
-    
-    #find the cells with no paths (nans)
-    nan_ind=np.argwhere(np.isnan(griddednorm_mean_test)).flatten()
-    for i in nan_ind:
-        griddednorm_mean_test[i] = 0
         
     df_save = df
     meandict = {'T' + str(period[i]): griddednorm_mean[:,i] for i in range(len(period))}
-    meandict_test = {'T' + str(period[i]) + 'test': griddednorm_mean_test[:,i] for i in range(len(period))}
-    d2 = {'griddedcounts': gridded_counts, 'griddedcountstest': gridded_counts_test}
+    # meandict_test = {'T' + str(period[i]) + 'test': griddednorm_mean_test[:,i] for i in range(len(period))}
+    d2 = {'griddedcounts': gridded_counts}
     d2.update(meandict)
-    d2.update(meandict_test)
+    # d2.update(meandict_test)
     df2 = pd.DataFrame(data=d2)   
     # df_save.append(df2)
     df_save=pd.concat([df_save,df2],axis=1)
-    df_save.to_csv(folder_path + 'griddedvalues.csv')
+    df_save.to_csv(folder_path + 'griddedvalues_' + name +'.csv')
     
-    return griddednorm_mean, griddednorm_mean_test
+    return griddednorm_mean
 
 def save_gridded_targets(griddednorm_mean,griddednorm_mean_test,gridded_counts,gridded_counts_test,df, folder_path):
     import pandas as pd

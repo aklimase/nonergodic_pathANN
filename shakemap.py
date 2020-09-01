@@ -19,19 +19,19 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import sys
 import os
-sys.path.append(os.path.abspath('/Users/aklimasewski/Documents/nonergodic_python_code_nonergodic'))
-from preprocessing import transform_dip, readindata, transform_data, create_grid, grid_data
-from model_plots import gridded_plots, plot_resid, obs_pre
+sys.path.append(os.path.abspath('/Users/aklimasewski/Documents/python_code_nonergodic'))
+from preprocessing import transform_dip, readindata, transform_data, add_locfeat, add_az #, create_grid, grid_data
+from model_plots import plot_resid, obs_pre
 from build_ANN import create_ANN
 import numpy as np
 import openquake
 
 #use pandas to match event identifiers
 # folder_pathmod + 'test_obs_pre.csv
-folder_path = '/Users/aklimasewski/Documents/models/create_grid_2/'
+folder_path = '/Users/aklimasewski/Documents/model_results/shakemap/'
 
 # folder_pathmod = folder_path + 'ANN13_gridmidpoints_az_40ep_1_40/'
-folder_pathmod = folder_path + 'ANN13_gridmidpoints_az_13ep_1_50/'
+folder_pathmod =  '/Users/aklimasewski/Documents/model_results/base/ANN18_xi_normalizer_40ep_50hidden/'
 #full dataset
 nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv'
 nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv'
@@ -49,12 +49,14 @@ print(dftrain['Source_ID'], dftrain['Rupture_ID'])#, dftrain['Rup_Var_ID'])
 eventid = []
 
 for i in range(len(dftrain)):
-    eventid.append(str(dftrain['Source_ID'][i]) + '_' + str(dftrain['Rupture_ID'][i]) + '_' + str(dftrain['Rup_Var_ID'][i]))
+    eventid.append(str(dftrain['Source_ID'][i]) + '_' + str(dftrain['Rupture_ID'][i])) #+ '_' + str(dftrain['Rup_Var_ID'][i]))
 eventid_unique = list(set(eventid))
 
+sourceid = 148
+ruptureid = 1
 #find all instances of events (on all stations and grab stations and predictions at each station)
 #source id 1-288, rupture id 1-1296, rup var 1-604
-eventids = dftrain.loc[(dftrain['Source_ID'] == 265) & (dftrain['Rupture_ID']== 81) & (dftrain['Rup_Var_ID']==55)]
+eventids = dftrain.loc[(dftrain['Source_ID'] == sourceid) & (dftrain['Rupture_ID']== ruptureid )]# & (dftrain['Rup_Var_ID']==55)]
 inds = eventids.index.values
 # read in csvs of ytrain and prediction
 
@@ -71,26 +73,11 @@ target_pre = dftrain_obspre[colnames[10:20]].iloc[inds]
 
 #%%
 #base models
-#write a function
-# import openquake.hazardlib.gsim.abrahamson_silva_2008 as abrahamson_silva_2008
-# import openquake.hazardlib.gsim.abrahamson_silva_2008 as gmpeASK
-
-# import openquake.hazardlib.gsim.boore_atkinson_2008 as boore_atkinson_2008
-# import openquake.hazardlib.gsim.boore_atkinson_2008 as gmpeBSSA
-
-# import openquake.hazardlib.gsim.campbell_bozorgnia_2008 as campbell_bozorgnia_2008
-# import openquake.hazardlib.gsim.campbell_bozorgnia_2008 as gmpeCB
-
-# import openquake.hazardlib.gsim.chiou_youngs_2008 as chiou_youngs_2008
-# import openquake.hazardlib.gsim.chiou_youngs_2008 as gmpeCY
-
-# import openquake.hazardlib.gsim.boore_atkinson_2008 as gmpeBSSA
-
 
 
 
 #%% 
-
+import keras
 #open trained model
 keras.models.load_model(folderpath_mod + "model")
 #%%
@@ -99,11 +86,8 @@ keras.models.load_model(folderpath_mod + "model")
 n = 13
 train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = n)
 #add the location features
-train_data1_4, test_data1_4, train_targets1_4, test_targets1_4, feature_names_4 = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = 4)
-train_data1 = np.concatenate([train_data1,train_data1_4], axis = 1)
-test_data1 = np.concatenate([test_data1,test_data1_4], axis = 1)
-feature_names = np.concatenate([feature_names,feature_names_4], axis = 0)
-
+train_data1,test_data1, feature_names = add_locfeat(train_data1,test_data1, feature_names)
+train_data1,test_data1, feature_names = add_az(train_data1,test_data1, feature_names)
 
 data = train_data1
 
@@ -133,7 +117,7 @@ for i in range(len(period)):
     s_m.set_array([])
     
     fig, (ax1, ax2) = plt.subplots(1, 2,figsize=(12,6))
-    plt.suptitle('Period ' + str(period[i]) + ' s')
+    plt.suptitle('Period ' + str(period[i]) + ' s, Source ID ' + str(sourceid) + ' Rup ID ' + str(ruptureid))
     ax1.set_title('observation')
     ax1.scatter(evlon,evlat,marker = '*', s=0.2, c = 'gray', label = 'event', alpha = 0.02)
     ax1.scatter(sitelon,sitelat,marker = '^',s=0.2, c = 'black', label = 'site', alpha = 0.02)
@@ -142,7 +126,7 @@ for i in range(len(period)):
     ax1.set_xlim(-120,-116.5)
     ax1.set_ylim(33,35.5)
    
-    ax2.set_title('prediction')
+    ax2.set_title('ANN prediction')
     ax2.scatter(evlon,evlat,marker = '*', s=0.2, c = 'gray', label = 'event', alpha = 0.02)
     ax2.scatter(sitelon,sitelat,marker = '^',s=0.2, c = 'black', label = 'site', alpha = 0.02)
     ax2.scatter(sitelon_ev, sitelat_ev, s=50, c = colors_pre)    
@@ -152,8 +136,9 @@ for i in range(len(period)):
     # plt.title(colname)
     plt.legend(loc = 'lower left')
     
-    fig.subplots_adjust(right=0.8)
-    cbar = plt.colorbar(s_m, orientation='vertical')
+    plt.subplots_adjust(right=0.9)
+    cbar_ax = fig.add_axes([0.92, 0.15, 0.03, 0.7])
+    cbar = plt.colorbar(s_m, orientation='vertical',cax=cbar_ax)
     # cbar.set_label(colname[i] + ' counts', fontsize = 20)
     plt.savefig(folder_pathmod + 'shakemap_' + str(period[i]) +'.png')
     plt.show()

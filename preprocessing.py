@@ -8,7 +8,34 @@ Created on Mon Jul 20 14:57:47 2020
 functions for preprocessings ANN data
 """
 
-def transform_dip(diptrain,diptest,rxtrain,rxtest):
+# def transform_dip(diptrain,diptest,rxtrain,rxtest):
+#     '''
+#     transforms cybershake dips and Rx
+    
+#     Parameters
+#     ----------
+#     diptrain: numpy array of cybershake fault dips of training data
+#     diptest: numpy array of cybershake fault dips of testing data
+#     rxtrain: numpy array of rx train
+#     rxtest: numpy array of rx test
+    
+#     returns transformed inputs as numpy arrays
+#     '''
+#     for i in range(len(diptrain)):
+#         if diptrain[i]>30:
+#             rxtrain[i]=rxtrain[i]*(90-diptrain[i])/45
+#         else:
+#             rxtrain[i]=rxtrain[i]*60/45
+            
+#     for i in range(len(diptest)): 
+#         if diptest[i]>30:
+#             rxtest[i]=rxtest[i]*(90-diptest[i])/45
+#         else:
+#             rxtest[i]=rxtest[i]*60/45    
+#     #return the transformed arrays
+#     return diptrain, diptest, rxtrain, rxtest
+
+def transform_dip(dip,rx):
     '''
     transforms cybershake dips and Rx
     
@@ -21,20 +48,14 @@ def transform_dip(diptrain,diptest,rxtrain,rxtest):
     
     returns transformed inputs as numpy arrays
     '''
-    for i in range(len(diptrain)):
-        if diptrain[i]>30:
-            rxtrain[i]=rxtrain[i]*(90-diptrain[i])/45
+    for i in range(len(dip)):
+        if (dip[i] > 30):
+            rx[i]=rx[i]*(90.-dip[i])/45.
         else:
-            rxtrain[i]=rxtrain[i]*60/45
+            rx[i]=rx[i]*60./45.
             
-    for i in range(len(diptest)): 
-        if diptest[i]>30:
-            rxtest[i]=rxtest[i]*(90-diptest[i])/45
-        else:
-            rxtest[i]=rxtest[i]*60/45    
     #return the transformed arrays
-    return diptrain, diptest, rxtrain, rxtest
-
+    return dip, rx
 
 def readindata(nametrain, nametest, n):
     '''
@@ -122,7 +143,10 @@ def readindata(nametrain, nametest, n):
     xitest=dftest["xi"]
     startdepthtest=dftest["Start_Depth"]
     
-    diptrain, diptest, rxtrain, rxtest = transform_dip(diptrain=np.array(diptrain),diptest=np.array(diptest),rxtrain=np.array(rxtrain),rxtest=np.array(rxtest))
+    # diptrain, diptest, rxtrain, rxtest = transform_dip(diptrain=np.array(diptrain),diptest=np.array(diptest),rxtrain=np.array(rxtrain),rxtest=np.array(rxtest))
+    diptrain, rxtrain= transform_dip(np.array(diptrain),np.array(rxtrain))
+    diptest, rxtest= transform_dip(np.array(diptest),np.array(rxtest))
+
     
     if n == 6:
         train_data1 = np.column_stack([hypodistrain, lattrain, longtrain, hypolattrain, hypolontrain, hypodepthtrain])

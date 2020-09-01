@@ -10,8 +10,10 @@ Created on Tue Jul 28 16:38:58 2020
 import sys
 import os
 sys.path.append(os.path.abspath('/Users/aklimasewski/Documents/pythoncode_nonergodic_ANN'))
-from preprocessing import transform_dip, readindata, transform_data, create_grid, grid_data
-from model_plots import gridded_plots, obs_pre, plot_resid, plot_outputs
+from preprocessing import transform_dip, readindata, transform_data
+from build_ANN import create_ANN
+from model_plots import obs_pre, plot_resid, plot_outputs
+from grid_funcs import gridded_plots, create_grid, grid_data, mean_grid_save
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
@@ -46,7 +48,7 @@ sns.set_context(context='talk',font_scale=0.7)
 
 #%%
 topdir = '/Users/aklimasewski/Documents/'
-folder_path = topdir + 'models/2step_ANN/model12/'
+folder_path = topdir + 'models/2step_ANN_avgcellfeatures/model12/'
 
 if not os.path.exists(folder_path):
     os.makedirs(folder_path)
@@ -55,7 +57,7 @@ transform_method = 'Norm'
 epochs = 15
 batch_size = 264
 numlayers = 1
-units = [10]
+units = [50]
 
 train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain= topdir + 'data/cybertrainyeti10_residfeb.csv', nametest=topdir + 'data/cybertestyeti10_residfeb.csv', n=12)
 x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path)
@@ -70,25 +72,26 @@ plot_resid(resid_train, resid_test, folder_path)
 '''
 
 #2d ANN of gridded residuals
-folder_path = topdir + 'models/2step_ANN/modelgriddedresiduals_1/'
+folder_path = topdir + 'model_results/2step_ANN_avgcellfeatures/modelgriddedresiduals1/'
 if not os.path.exists(folder_path):
     os.makedirs(folder_path)
 
-df, lon, lat = create_grid(dx = 0.1)
+df, lon, lat = create_grid(dx = 1.0)
 
 train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain= topdir + 'data/cybertrainyeti10_residfeb.csv', nametest=topdir + 'data/cybertestyeti10_residfeb.csv', n=6)
 
-hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts = grid_data(train_data1, train_targets1 = resid_train, df=df, nsamples = nsamples)     
-hypoR_test, sitelat_test, sitelon_test, evlat_test, evlon_test, target_test, gridded_targetsnorm_list_test, gridded_counts_test = grid_data(test_data1, train_targets1 = resid_test, df=df, nsamples = nsamples)    
+hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts = grid_data(train_data1, train_targets1 = resid_train, df=df)     
+hypoR_test, sitelat_test, sitelon_test, evlat_test, evlon_test, target_test, gridded_targetsnorm_list_test, gridded_counts_test = grid_data(test_data1, train_targets1 = resid_test, df=df)    
 
 #%%
     
-gridded_mean,gridded_mean_test= mean_grid(gridded_targetsnorm_list,gridded_targetsnorm_list_test,gridded_counts,gridded_counts_test,folder_path)
+gridded_mean= mean_grid_save(gridded_targetsnorm_list,gridded_counts,df,folder_path,name='train_dx_1')
+gridded_mean_test= mean_grid_save(gridded_targetsnorm_list_test,gridded_counts_test,df,folder_path,name='test_dx_1')
 
-gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evlat, sitelon, sitelat, folder_path)
+gridded_plots(gridded_mean, gridded_counts, period, lat, lon, evlon, evlat, sitelon, sitelat, folder_path)
 #%%
-y_train = griddednorm_mean
-y_test = griddednorm_mean_test
+y_train = gridded_mean
+y_test = gridded_mean_test
 
 # x_test
 x_train = df.drop(['polygon'], axis=1)
