@@ -87,6 +87,7 @@ filenamenga = '/Users/aklimasewski/Documents/data/NGA_mag2_9.csv'
 
 nga_data1, nga_targets1, feature_names = readindataNGA(filenamenga,n)
 nga_data1, feature_names = add_azNGA(filenamenga, nga_data1, feature_names)
+
 from sklearn.model_selection import train_test_split
 ngatrain, ngatest, ngatrain_targets, ngatest_targets = train_test_split(nga_data1,nga_targets1, test_size=0.2, random_state=1)
 
