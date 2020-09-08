@@ -44,9 +44,6 @@ unit_est = 2*(n+10)+1
 numlayers = 1
 units= [20]
 
-folder_pathmod = folder_path + 'n4_ANN13_gridmidpoints_az_20ep_1_20/'
-if not os.path.exists(folder_pathmod):
-    os.makedirs(folder_pathmod)
 
 #create grid of polygons in a dataframe
 # df, lon, lat = create_grid_square(latmin=31.75,latmax=40.0,lonmin=-124,lonmax=-115.3,dx=.3,dy=0.25)
@@ -93,7 +90,6 @@ df, lon, lat = create_grid_square(latmin=33,latmax=36.0,lonmin=-120.5,lonmax=-11
 
 # #split nga into training and testing
 # #%%
-from sklearn.model_selection import train_test_split
 # nga_data1 = np.concatenate([nga_data1,cells_nga], axis = 1)
 # ngatrain, ngatest, ngatrain_targets, ngatest_targets = train_test_split(nga_data1,nga_targets1, test_size=0.2, random_state=1)
 
@@ -112,67 +108,130 @@ from sklearn.model_selection import train_test_split
 
 #%%
 
+def mergeNGA_cells(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', filenamenga= '/Users/aklimasewski/Documents/data/NGA_mag2_9.csv', n=13):
+    from sklearn.model_selection import train_test_split
+        
+    cells = pd.read_csv(folder_path + 'gridpointslatlon_train.csv',header = 0,index_col=0)
+    cells_test = pd.read_csv(folder_path + 'gridpointslatlon_test.csv',header = 0,index_col=0)
+    cells_nga = pd.read_csv(folder_path + 'gridpointslatlon_nga.csv',header = 0,index_col=0)
 
-
-#2 step model
-train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = n)
-train_data1,test_data1, feature_names = add_az(train_data1,test_data1, feature_names)
-
-filenamenga = '/Users/aklimasewski/Documents/data/NGA_mag2_9.csv'
-nga_data1, nga_targets1, feature_names = readindataNGA(filenamenga,n)
-nga_data1, feature_names = add_azNGA(filenamenga, nga_data1, feature_names)
-
-cells = pd.read_csv(folder_path + 'gridpointslatlon_train.csv',header = 0,index_col=0)
-cells_test = pd.read_csv(folder_path + 'gridpointslatlon_test.csv',header = 0,index_col=0)
-cells_nga = pd.read_csv(folder_path + 'gridpointslatlon_nga.csv',header = 0,index_col=0)
-
-ngatrain, ngatest, ngatrain_targets, ngatest_targets, ngacells_train, ngacells_test = train_test_split(nga_data1,nga_targets1,cells_nga, test_size=0.2, random_state=1)
-
-# ngatrain, ngatest, ngatrain_targets, ngatest_targets = train_test_split(nga_data1,nga_targets1, test_size=0.2, random_state=1)
-
-train_data1 = np.concatenate([train_data1,ngatrain], axis = 0)
-test_data1 = np.concatenate([test_data1,ngatest], axis = 0)
-
-train_targets1 = np.concatenate([train_targets1,ngatrain_targets], axis = 0)
-test_targets1 = np.concatenate([test_targets1,ngatest_targets], axis = 0)
-
-x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_pathmod)
-
-# numlayers = 1
-# units= [50]
-resid, resid_test, pre_train, pre_test = create_ANN(x_train, y_train, x_test, y_test, feature_names, numlayers, units, epochs, transform_method, folder_pathmod)
-
-period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
-plot_resid(resid, resid_test, folder_pathmod)
-
-###############################################################################
-#second ANN
-folder_pathmod = folder_path + 'n4_ANN2_gridmidpoints_pt_30ep_1_10/'
-if not os.path.exists(folder_pathmod):
-    os.makedirs(folder_pathmod)
+    #2 step model
+    train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = n)
+    train_data1,test_data1, feature_names = add_az(train_data1,test_data1, feature_names)
     
-train_targets1 = resid
-test_targets1 = resid_test
+    filenamenga = '/Users/aklimasewski/Documents/data/NGA_mag2_9.csv'
+    nga_data1, nga_targets1, feature_names = readindataNGA(filenamenga,n)
+    nga_data1, feature_names = add_azNGA(filenamenga, nga_data1, feature_names)
+    nga_data1 = np.concatenate([nga_data1,cells_nga], axis = 0)
 
-#split cells with 
-# ngatrain, ngatest = train_test_split(cells_nga, test_size=0.2, random_state=1)
-# train_data1 = np.concatenate([cells,ngacells_train], axis = 0)
-# test_data1 = np.concatenate([cells_test,ngacells_test], axis = 0)
+    ngatrain, ngatest, ngatrain_targets, ngatest_targets = train_test_split(nga_data1,nga_targets1,test_size=0.2, random_state=1)
+        
+    feature_names = np.concatenate([feature_names,['eventlat','eventlon','midlat','midlon','sitelat','sitelon',]], axis = 0)
 
-train_data1 = np.asarray(cells)
-test_data1 = np.asarray(cells_test)
+    train_data1 = np.concatenate([train_data1,cells], axis = 1)
+    test_data1 = np.concatenate([test_data1,cells_test], axis = 1)
+    
+    train_data1 = np.concatenate([train_data1,ngatrain], axis = 0)
+    test_data1 = np.concatenate([test_data1,ngatest], axis = 0)
 
-transform_method = PowerTransformer()
-feature_names = np.asarray(['eventlat','eventlon','midlat','midlon','sitelat','sitelon',])
+    train_targets1 = np.concatenate([train_targets1,ngatrain_targets], axis = 0)
+    test_targets1 = np.concatenate([test_targets1,ngatest_targets], axis = 0)
+    
+    return train_data1, test_data1, train_targets1, test_targets1, feature_names
 
-x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_pathmod)
-epochs = 30
-numlayers = 1
-units= [10]
-resid, resid_test, pre_train, pre_test = create_ANN(x_train, y_train, x_test, y_test, feature_names, numlayers, units, epochs, transform_method, folder_pathmod)
+def mergeNGA(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', filenamenga= '/Users/aklimasewski/Documents/data/NGA_mag2_9.csv', n=13):
+    train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = n)
+    train_data1,test_data1, feature_names = add_az(train_data1,test_data1, feature_names)
+    
+    # filenamenga = '/Users/aklimasewski/Documents/data/NGA_mag2_9.csv'
+    nga_data1, nga_targets1, feature_names = readindataNGA(filenamenga,n)
+    nga_data1, feature_names = add_azNGA(filenamenga, nga_data1, feature_names)
+        
+    # ngatrain, ngatest, ngatrain_targets, ngatest_targets = train_test_split(nga_data1,nga_targets1, test_size=0.2, random_state=1)
+    ngatrain, ngatest, ngatrain_targets, ngatest_targets, ngacells_train, ngacells_test = train_test_split(nga_data1,nga_targets1,cells_nga, test_size=0.2, random_state=1)
 
-period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
-plot_resid(resid, resid_test, folder_pathmod)
+    train_data1 = np.concatenate([train_data1,ngatrain], axis = 0)
+    test_data1 = np.concatenate([test_data1,ngatest], axis = 0)
+
+    train_data1 = np.concatenate([train_data1,ngatrain], axis = 0)
+    test_data1 = np.concatenate([test_data1,ngatest], axis = 0)
+
+    train_targets1 = np.concatenate([train_targets1,ngatrain_targets], axis = 0)
+    test_targets1 = np.concatenate([test_targets1,ngatest_targets], axis = 0)
+    
+    return train_data1, test_data1, train_targets1, test_targets1, feature_names
+
+def mergeNGAcells():
+    from sklearn.model_selection import train_test_split
+        
+    cells = pd.read_csv(folder_path + 'gridpointslatlon_train.csv',header = 0,index_col=0)
+    cells_test = pd.read_csv(folder_path + 'gridpointslatlon_test.csv',header = 0,index_col=0)
+    cells_nga = pd.read_csv(folder_path + 'gridpointslatlon_nga.csv',header = 0,index_col=0)
+    
+    ngacells_train, ngacells_test = train_test_split(cells_nga, test_size=0.2, random_state=1)
+
+    train_data1 = np.concatenate([cells, ngacells_train], axis = 0)
+    test_data1 = np.concatenate([cells_test, ngacells_test], axis = 0)
+    feature_names = np.asarray(['eventlat','eventlon','midlat','midlon','sitelat','sitelon',])
+
+    return train_data1, test_data1, feature_names
+  
+#%%
+folder_pathmod = folder_path + 'n4_ANN13_gridmidpoints_az_20ep_1_20/'
+def ANN_gridpoints(folder_pathmod, epochs=50, numlayers = 1, units= [20]):
+    
+    if not os.path.exists(folder_pathmod):
+        os.makedirs(folder_pathmod)
+        
+    transform_method = 'Norm' #function or text
+    n = 13
+    #or n = 6, 4
+    train_data1, test_data1, train_targets1, test_targets1, feature_names = mergeNGA_cells(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', filenamenga= '/Users/aklimasewski/Documents/data/NGA_mag2_9.csv', n=13)
+     
+    x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_pathmod)
+    
+    resid, resid_test, pre_train, pre_test = create_ANN(x_train, y_train, x_test, y_test, feature_names, numlayers, units, epochs, transform_method, folder_pathmod)
+    
+    period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
+    plot_resid(resid, resid_test, folder_pathmod)
+  
+#%%
+folder_pathmod1 = folder_path + 'n4_ANN13_20ep_1_20/'
+folder_pathmod2 = folder_path + 'n4_ANN2_30ep_1_10/'
+
+def ANN_2step(folder_pathmod1, folder_pathmod2, epochs1=50, epochs2=50, numlayers1 = 1, numlayers2 = 1, units1= [20],units2= [20]):
+    
+    if not os.path.exists(folder_pathmod):
+        os.makedirs(folder_pathmod)
+        
+    train_data1, test_data1, train_targets1, test_targets1, feature_names = mergeNGA(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', filenamenga= '/Users/aklimasewski/Documents/data/NGA_mag2_9.csv', n=13)
+    
+    transform_method = 'Norm' #function or text
+    x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_pathmod)
+    
+    resid, resid_test, pre_train, pre_test = create_ANN(x_train, y_train, x_test, y_test, feature_names, numlayers, units, epochs, transform_method, folder_pathmod)
+    
+    period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
+    plot_resid(resid, resid_test, folder_pathmod)
+    
+    ###############################################################################
+    #second ANN
+    if not os.path.exists(folder_pathmod):
+        os.makedirs(folder_pathmod)
+        
+    train_targets1 = resid
+    test_targets1 = resid_test
+    
+    train_data1, test_data1, feature_names = mergeNGAcells()
+    
+    transform_method = PowerTransformer()
+    
+    x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_pathmod)
+
+    resid, resid_test, pre_train, pre_test = create_ANN(x_train, y_train, x_test, y_test, feature_names, numlayers, units, epochs, transform_method, folder_pathmod)
+    
+    period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
+    plot_resid(resid, resid_test, folder_pathmod)
 
 
 #####
