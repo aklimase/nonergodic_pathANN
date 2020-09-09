@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Sep  2 13:55:14 2020
+Created on Tue Sep  8 14:01:05 2020
 
 @author: aklimasewski
 """
-
-
 
 import numpy as np
 import pandas as pd
@@ -35,12 +33,12 @@ folder_path = '/Users/aklimasewski/Documents/model_results/crossedcols/'
 if not os.path.exists(folder_path):
     os.makedirs(folder_path)
     
-folder_pathmod = folder_path + 'crossedlatlon_bucket1000_10_10ep/'
+folder_pathmod = folder_path + 'crossedlatlon_linear_bucket1000_10_30ep/'
 
 if not os.path.exists(folder_pathmod):
     os.makedirs(folder_pathmod)
 
-epochs = 10
+epochs = 30
 hash_bucket_size = 1000
 bucketsize = 10
 
@@ -51,15 +49,53 @@ train_data1,test_data1, feature_names = add_az(train_data1,test_data1, feature_n
 #load in location data for crossed features
 train_data1_4, test_data1_4, train_targets1_4, test_targets1_4, feature_names_4 = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = 4)
 
-train_data1 = np.concatenate([train_data1,train_data1_4], axis = 1)
-test_data1 = np.concatenate([test_data1,test_data1_4], axis = 1)
-feature_names = np.concatenate([feature_names,feature_names_4])
- 
+# train_data1 = np.concatenate([train_data1,train_data1_4], axis = 1)
+# test_data1 = np.concatenate([test_data1,test_data1_4], axis = 1)
+# feature_names = np.concatenate([feature_names,feature_names_4])
+
+#%%
+
+
+#separate latitude and longiutde into length 2 vectors for input
+stloc = np.asarray([(train_data1_4[i,0],train_data1_4[i,1]) for i in range(train_data1_4.shape[0])])
+evloc = np.asarray([(train_data1_4[i,2],train_data1_4[i,3]) for i in range(train_data1_4.shape[0])])
+
+stlocdf = pd.DataFrame(data=pd.Series(list(stloc)),columns=['stloc'])
+evlocdf = pd.DataFrame(data=pd.Series(list(evloc)),columns=['evloc'])
+
+stloctest = np.asarray([(test_data1_4[i,0],test_data1_4[i,1]) for i in range(test_data1_4.shape[0])])
+evloctest = np.asarray([(test_data1_4[i,2],test_data1_4[i,3]) for i in range(test_data1_4.shape[0])])
+
+stlocdftest = pd.DataFrame(data=pd.Series(list(stloctest)),columns=['stloc'])
+evlocdftest = pd.DataFrame(data=pd.Series(list(evloctest)),columns=['evloc'])
+
 
 #%%
 
 traindf = pd.DataFrame(data=train_data1,columns=feature_names)
 testdf = pd.DataFrame(data=test_data1,columns=feature_names)
+
+traindf = traindf.join(stlocdf)
+traindf = traindf.join(evlocdf)
+
+testdf = testdf.join(stlocdftest)
+testdf = testdf.join(evlocdftest)
+
+feature_names = np.concatenate([feature_names,['stloc','evloc']])
+
+
+def dfToFeature(df):
+    result = {}
+    for key in traindf.keys():
+        result[key] = np.vstack(df[key])
+    return result
+
+result=dfToFeature(traindf)
+traindf =result
+
+result=dfToFeature(testdf)
+testdf =result
+
 
 periodnames = ['T10.000S','T7.500S','T5.000S','T4.000S','T3.000S','T2.000S','T1.000S','T0.200S','T0.500S','T0.100S']
 traintargetsdf = pd.DataFrame(data=train_targets1,columns=periodnames)
@@ -73,6 +109,7 @@ def df_to_dataset(traindf,traintargetsdf, shuffle=True, batch_size=256):
     dataframe = traindf.copy()
     labels = traintargetsdf
     ds = tf.data.Dataset.from_tensor_slices((dict(dataframe), labels))
+    
     if shuffle:
         ds = ds.shuffle(buffer_size=len(dataframe))
     ds = ds.batch(batch_size)
@@ -98,8 +135,9 @@ def get_normalization_parameters(traindf, features):
         trainmean = traindf[column].mean()
         trainmax = traindf[column].max()
         trainmin = traindf[column].min()
+        trainstd = traindf[column].std()
 
-        return {'mean': trainmean, 'max': trainmax, 'min': trainmin}
+        return {'mean': trainmean, 'max': trainmax, 'min': trainmin,'std': trainstd}
 
     normalization_parameters = {}
     for column in features:
@@ -118,15 +156,70 @@ feature_columns = []
 
 # numeric cols
 # doesn't hold data
-for header in feature_names:#[0:14]:
+for header in feature_names[0:14]:
     normparams = column_params[header]
     mean = normparams['mean']
     maximum = normparams['max']
     minimum = normparams['min']
     normalizer_fn = make_norm(mean, maximum, minimum)
     feature_columns.append(feature_column.numeric_column(header,normalizer_fn=normalizer_fn))
-    
-  
+
+
+
+# def get_normalization_parametersloc(st,ev,features):
+#     """Get the normalization parameters (E.g., mean, std) for traindf for 
+#     features. We will use these parameters for training, eval, and serving."""
+
+#     def score_params(column):
+        
+#         trainmean_lat = traindf[column][:,0].mean()
+#         trainstd_lat = traindf[column][:,0].std()
+        
+#         trainmean_lon = traindf[column][:,1].mean()
+#         trainstd_lon = traindf[column][:,1].std()
+
+#         return {'meanlat': trainmean_lat, 'stdlat': trainstd_lat, 'meanlon': trainmean_lon, 'stdlon': trainstd_lon}
+
+#     normalization_parameters = {}
+#     for column in features:
+#         normalization_parameters[column] = score_params(column)
+#     return normalization_parameters
+
+
+# def make_norm(mean_lat, std_lat, mean_lon, std_lon):
+#     def normcol1(col):
+#         col1 = col[:,0]
+#         col2 = col[:,1]
+#         norm_func = (col1-mean_lat)/std_lat, (col2-mean_lon)/std_lon
+#         return norm_func
+#     return normcol1, normcol2
+
+# # def make_norm(mean, std):
+# #     def normcol(col):
+# #         norm_func = (col-mean)/std
+# #         return norm_func
+# #     return normcol
+
+# column_paramsloc = get_normalization_parametersloc(traindf['stloc'],traindf['evloc'],feature_names[14:16])
+
+# # #length 2 of locations
+
+import tensorflow.Transform as tft
+
+for header in feature_names[14:16]:
+    # normalizer_fn = make_pt()
+    # feature_columns.append(feature_column.numeric_column(header,shape=(2,),normalizer_fn=None))
+    normparams = column_paramsloc[header]
+    mean_lat = normparams['meanlat']
+    std_lat = normparams['stdlat']
+    mean_lon = normparams['meanlon']
+    std_lon = normparams['stdlon']
+    normalizer_fn = make_norm(mean, maximum, minimum)
+    # feature_columns.append(feature_column.numeric_column(header,shape=(2,), normalizer_fn=make_norm(mean_lat, std_lat), make_norm(mean_lon, std_lon)]))
+    feature_columns.append(feature_column.numeric_column(header,shape=(2,), normalizer_fn= normalizer_fn))
+
+
+
 #%%
 #crossed columns
 
@@ -237,7 +330,3 @@ file.close()
 
 period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 plot_resid(resid_train, resid_test, folder_pathmod)
-
-# obs_pre(train_targets1, test_targets1, pre_train, pre_test, period, folder_pathmod)
-
-
