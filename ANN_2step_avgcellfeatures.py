@@ -34,16 +34,13 @@ import os
 import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
 import tensorflow_probability as tfp
-# For numeric stability, set the default floating-point dtype to float64
 tf.keras.backend.set_floatx('float64')
-
 sns.reset_defaults()
 sns.set_style('whitegrid')
 sns.set_context('talk')
 sns.set_context(context='talk',font_scale=0.7)
 
 
-#%%
 topdir = '/Users/aklimasewski/Documents/'
 folder_path = topdir + 'models/2step_ANN_avgcellfeatures/model12/'
 
@@ -56,6 +53,10 @@ batch_size = 264
 numlayers = 1
 units = [50]
 
+'''
+1st ANN base model
+'''
+
 train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain= topdir + 'data/cybertrainyeti10_residfeb.csv', nametest=topdir + 'data/cybertestyeti10_residfeb.csv', n=12)
 x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path)
 
@@ -65,28 +66,29 @@ period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 plot_resid(resid_train, resid_test, folder_path)
 
 '''
-2nd ANN of gridded residuals
+2nd ANN of gridded residuals with grid cells as features and gridded ANN residuals as targets
 '''
 
-#2d ANN of gridded residuals
-folder_path = topdir + 'model_results/2step_ANN_avgcellfeatures/modelgriddedresiduals1/'
-if not os.path.exists(folder_path):
-    os.makedirs(folder_path)
+# 2d ANN of gridded residuals
+folder_pathmod = topdir + 'model_results/2step_ANN_avgcellfeatures/modelgriddedresiduals1/'
+if not os.path.exists(folder_pathmod):
+    os.makedirs(folder_pathmod)
+
+'''
+grid data 
+'''
 
 df, lon, lat = create_grid(dx = 1.0)
-
 train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain= topdir + 'data/cybertrainyeti10_residfeb.csv', nametest=topdir + 'data/cybertestyeti10_residfeb.csv', n=6)
 
 hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts = grid_data(train_data1, train_targets1 = resid_train, df=df)     
 hypoR_test, sitelat_test, sitelon_test, evlat_test, evlon_test, target_test, gridded_targetsnorm_list_test, gridded_counts_test = grid_data(test_data1, train_targets1 = resid_test, df=df)    
 
-#%%
-    
-gridded_mean= mean_grid_save(gridded_targetsnorm_list,gridded_counts,df,folder_path,name='train_dx_1')
-gridded_mean_test= mean_grid_save(gridded_targetsnorm_list_test,gridded_counts_test,df,folder_path,name='test_dx_1')
+gridded_mean = mean_grid_save(gridded_targetsnorm_list,gridded_counts,df,folder_pathmod,name='train_dx_1')
+gridded_mean_test = mean_grid_save(gridded_targetsnorm_list_test,gridded_counts_test,df,folder_pathmod,name='test_dx_1')
 
 gridded_plots(gridded_mean, gridded_counts, period, lat, lon, evlon, evlat, sitelon, sitelat, folder_path)
-#%%
+
 y_train = gridded_mean
 y_test = gridded_mean_test
 
@@ -98,9 +100,8 @@ feature_names = ['latmid','lonmid']
 transform_method = 'Norm'
 x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw = transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path)
 
-resid_train, resid_test, pre_train, pre_test= create_ANN(x_train, y_train, x_test, y_test, feature_names, numlayers, units, epochs, transform_method, folder_pathmod)
+resid_train, resid_test, pre_train, pre_test = create_ANN(x_train, y_train, x_test, y_test, feature_names, numlayers, units, epochs, transform_method, folder_pathmod)
  
 period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 plot_resid(resid_train, resid_test, folder_path)
-
 

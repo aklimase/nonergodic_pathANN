@@ -4,8 +4,11 @@
 Created on Wed Sep  2 13:55:14 2020
 
 @author: aklimasewski
-"""
 
+set up tensorflow data pipeline
+add numeric columns and crossed feature columns
+build ANN with feature layer
+"""
 
 import numpy as np
 import pandas as pd
@@ -14,7 +17,6 @@ import os
 sys.path.append(os.path.abspath('/Users/aklimasewski/Documents/python_code_nonergodic'))
 from preprocessing import transform_dip, readindata, transform_data, add_az
 from model_plots import plot_resid, obs_pre
-
 from keras import optimizers
 import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
@@ -53,8 +55,7 @@ train_data1_4, test_data1_4, train_targets1_4, test_targets1_4, feature_names_4 
 train_data1 = np.concatenate([train_data1,train_data1_4], axis = 1)
 test_data1 = np.concatenate([test_data1,test_data1_4], axis = 1)
 feature_names = np.concatenate([feature_names,feature_names_4])
- 
-#%%
+
 # create dataset
 traindf = pd.DataFrame(data=train_data1,columns=feature_names)
 testdf = pd.DataFrame(data=test_data1,columns=feature_names)
@@ -66,8 +67,11 @@ testtargetsdf = pd.DataFrame(data=test_targets1,columns=periodnames)
 print(len(traindf), 'train examples')
 print(len(testdf), 'test examples')
 
+'''
+set up dataframe pipeline
+'''
+
 def df_to_dataset(traindf,traintargetsdf, shuffle=True, batch_size=256):
-    # batch_size = traindf.shape[0]
     dataframe = traindf.copy()
     labels = traintargetsdf
     ds = tf.data.Dataset.from_tensor_slices((dict(dataframe), labels))
@@ -80,17 +84,14 @@ def df_to_dataset(traindf,traintargetsdf, shuffle=True, batch_size=256):
 train_ds = df_to_dataset(traindf,traintargetsdf, shuffle=False)
 test_ds = df_to_dataset(testdf,testtargetsdf, shuffle=False)
 
-#input pipeline
+# input pipeline
 for feature_batch, label_batch in train_ds.take(1):
   print('Every feature:', list(feature_batch.keys()))
   print('A batch of targets:', label_batch)
 
-#%%
 # set up numeric columns with normalization
-
 def get_normalization_parameters(traindf, features):
-    """Get the normalization parameters (E.g., mean, std) for traindf for 
-    features. We will use these parameters for training, eval, and serving."""
+    """Get the normalization parameters (E.g., mean, std) for traindf"""
 
     def score_params(column):
         trainmean = traindf[column].mean()
@@ -105,6 +106,9 @@ def get_normalization_parameters(traindf, features):
     return normalization_parameters
 
 def make_norm(mean, maximum, minimum):
+    '''
+    normalization function
+    '''
     def normcol(col):
         norm_func = 2.0/(maximum-minimum)*(col-mean)
         return norm_func
@@ -114,8 +118,7 @@ column_params = get_normalization_parameters(traindf,feature_names)
 
 feature_columns = []
 
-# numeric cols
-# doesn't hold data
+# create numeric columns
 for header in feature_names:#[0:14]:
     normparams = column_params[header]
     mean = normparams['mean']
@@ -123,14 +126,16 @@ for header in feature_names:#[0:14]:
     minimum = normparams['min']
     normalizer_fn = make_norm(mean, maximum, minimum)
     feature_columns.append(feature_column.numeric_column(header,normalizer_fn=normalizer_fn))
-  
-#%%
-# setup bucketized columns and then cross latitude and longitude
 
+'''
+setup bucketized columns and then cross latitude and longitude
+add crossed columns to the feature column list
+'''
 def get_quantile_based_boundaries(feature_values, num_buckets):
-  boundaries = np.arange(1.0, num_buckets) / num_buckets
-  quantiles = feature_values.quantile(boundaries)
-  return [quantiles[q] for q in quantiles.keys()]
+    # choose bins based on data percentages
+    boundaries = np.arange(1.0, num_buckets) / num_buckets
+    quantiles = feature_values.quantile(boundaries)
+    return [quantiles[q] for q in quantiles.keys()]
 
 stlon = tf.feature_column.numeric_column('stlon')
 bucketized_stlongitude = tf.feature_column.bucketized_column(
@@ -144,7 +149,7 @@ bucketized_stlatitude = tf.feature_column.bucketized_column(
 
 stlong_x_lat = tf.feature_column.crossed_column(set([bucketized_stlongitude, bucketized_stlatitude]), hash_bucket_size=hash_bucket_size) 
 
-#add crossed feature to columns
+# add crossed feature to columns
 stlong_x_lat = feature_column.indicator_column(stlong_x_lat)
 feature_columns.append(stlong_x_lat)
 
@@ -160,16 +165,16 @@ bucketized_evlatitude = tf.feature_column.bucketized_column(
 
 evlong_x_lat = tf.feature_column.crossed_column(set([bucketized_evlongitude, bucketized_evlatitude]), hash_bucket_size=hash_bucket_size) 
 
-#add crossed feature to columns
+# add crossed feature to columns
 evlong_x_lat = feature_column.indicator_column(evlong_x_lat)
 feature_columns.append(evlong_x_lat)
-#%%
-# build model
 
+'''
+build model with feature layers and feature columns
+'''
 feature_layer = tf.keras.layers.DenseFeatures(feature_columns)
 
 batch_size = 256
-# input_shape = train_ds.shape
 
 def build_model():
     model = tf.keras.Sequential()
@@ -177,7 +182,6 @@ def build_model():
     model.add(layers.Dense(50,activation='sigmoid'))#, input_shape=(18,)))
     model.add(layers.Dense(10)) #add sigmoid aciivation functio? (only alues betwen 0 and 1)    
     model.compile(optimizer=optimizers.Adam(lr=2e-3),loss='mse',metrics=['mae','mse']) 
-    #model.compile(optimizer='adam',loss='mse',metrics=['mae']) 
     return model
 
 model=build_model()
@@ -202,17 +206,14 @@ plt.grid()
 plt.savefig(folder_pathmod + 'error.png')
 plt.show()
 
-# pr1edict_mean = []
 pre_test = np.array(model.predict(test_ds))
 pre_train = np.array(model.predict(train_ds))
 
 #test data
 mean_x_test_allT = pre_test
-# predict_epistemic_allT = np.zeros(pre_test.shape)
 
 #training data
 mean_x_train_allT = pre_train
-# predict_epistemic_train_allT = np.zeros(pre.shape)
 
 resid_train =train_targets1-mean_x_train_allT
 resid_test = test_targets1-mean_x_test_allT
@@ -233,6 +234,6 @@ file.close()
 period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 plot_resid(resid_train, resid_test, folder_pathmod)
 
-# obs_pre(train_targets1, test_targets1, pre_train, pre_test, period, folder_pathmod)
+obs_pre(train_targets1, test_targets1, pre_train, pre_test, period, folder_pathmod)
 
 
