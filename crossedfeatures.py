@@ -7,7 +7,6 @@ Created on Wed Sep  2 13:55:14 2020
 """
 
 
-
 import numpy as np
 import pandas as pd
 import sys
@@ -55,9 +54,8 @@ train_data1 = np.concatenate([train_data1,train_data1_4], axis = 1)
 test_data1 = np.concatenate([test_data1,test_data1_4], axis = 1)
 feature_names = np.concatenate([feature_names,feature_names_4])
  
-
 #%%
-
+# create dataset
 traindf = pd.DataFrame(data=train_data1,columns=feature_names)
 testdf = pd.DataFrame(data=test_data1,columns=feature_names)
 
@@ -82,14 +80,14 @@ def df_to_dataset(traindf,traintargetsdf, shuffle=True, batch_size=256):
 train_ds = df_to_dataset(traindf,traintargetsdf, shuffle=False)
 test_ds = df_to_dataset(testdf,testtargetsdf, shuffle=False)
 
-
 #input pipeline
 for feature_batch, label_batch in train_ds.take(1):
   print('Every feature:', list(feature_batch.keys()))
-  # print('A batch of ages:', feature_batch['Age'])
   print('A batch of targets:', label_batch)
 
 #%%
+# set up numeric columns with normalization
+
 def get_normalization_parameters(traindf, features):
     """Get the normalization parameters (E.g., mean, std) for traindf for 
     features. We will use these parameters for training, eval, and serving."""
@@ -125,10 +123,9 @@ for header in feature_names:#[0:14]:
     minimum = normparams['min']
     normalizer_fn = make_norm(mean, maximum, minimum)
     feature_columns.append(feature_column.numeric_column(header,normalizer_fn=normalizer_fn))
-    
   
 #%%
-#crossed columns
+# setup bucketized columns and then cross latitude and longitude
 
 def get_quantile_based_boundaries(feature_values, num_buckets):
   boundaries = np.arange(1.0, num_buckets) / num_buckets
@@ -167,6 +164,7 @@ evlong_x_lat = tf.feature_column.crossed_column(set([bucketized_evlongitude, buc
 evlong_x_lat = feature_column.indicator_column(evlong_x_lat)
 feature_columns.append(evlong_x_lat)
 #%%
+# build model
 
 feature_layer = tf.keras.layers.DenseFeatures(feature_columns)
 
@@ -223,9 +221,6 @@ diff=np.std(resid_train,axis=0)
 difftest=np.std(resid_test,axis=0)
 #write model details to a file
 file = open(folder_pathmod + 'model_details.txt',"w+")
-# file.write('number training samples ' + str(len(train_ds)) + '\n')
-# file.write('number testing samples ' + str(len(x_test)) + '\n')
-# file.write('data transformation method ' + str(transform_method) + '\n')
 file.write('input feature names ' +  str(feature_names)+ '\n')
 file.write('number of epochs ' +  str(epochs)+ '\n')
 model.summary(print_fn=lambda x: file.write(x + '\n'))

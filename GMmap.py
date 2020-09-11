@@ -4,15 +4,11 @@
 Created on Thu Aug 20 17:27:09 2020
 
 @author: aklimasewski
-shakemap
+GMmap
 
-plot two panel "shakemap" to compare ANN predictions and base model predictions
+reads in cybershake data, finds list of unique source ids
+plot two panel "map" to compare ANN predictions and base model predictions spatial
 """
-
-
-#plot stations by ground motions predicted, actual and base
-
-#for one event, plot predictions at stations
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -26,71 +22,75 @@ from build_ANN import create_ANN
 import numpy as np
 import openquake
 
-#use pandas to match event identifiers
-# folder_pathmod + 'test_obs_pre.csv
-folder_path = '/Users/aklimasewski/Documents/model_results/shakemap/'
-
-# folder_pathmod = folder_path + 'ANN13_gridmidpoints_az_40ep_1_40/'
+# path of model to be plotted
 folder_pathmod =  '/Users/aklimasewski/Documents/model_results/base/ANN18_xi_normalizer_40ep_50hidden/'
-#full dataset
+
+def unique_events(df):
+    '''
+    sorts through dataframe and creates list of unique events with 'Source_ID' and 'Rupture_ID' 
+    
+    Parameters
+    ----------
+    df: dataframe from cybershake csv file
+    
+    Returns
+    -------
+    eventid_unique: list of string source id and rupture id
+    '''
+    
+    # pick out ev ids
+    print(df['Source_ID'], df['Rupture_ID'])#, dftrain['Rup_Var_ID'])
+    
+    eventid = []
+    for i in range(len(df)):
+        eventid.append(str(df['Source_ID'][i]) + '_' + str(df['Rupture_ID'][i])) #+ '_' + str(dftrain['Rup_Var_ID'][i]))
+    eventid_unique = list(set(eventid))
+    return eventid_unique
+
+
 nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv'
 nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv'
 
 dftrain = pd.read_pickle(nametrain) 
 dftest = pd.read_pickle(nametest)
-
 dftrain = dftrain.reset_index()
+dftest = dftest.reset_index()
 
+eventid_unique  = unique_events(dftrain)
+print('number of unique events: ' + len(eventid_unique))
 
-#pick out ev ids
-print(dftrain['Source_ID'], dftrain['Rupture_ID'])#, dftrain['Rup_Var_ID'])
-#make a set for all events
-
-eventid = []
-
-for i in range(len(dftrain)):
-    eventid.append(str(dftrain['Source_ID'][i]) + '_' + str(dftrain['Rupture_ID'][i])) #+ '_' + str(dftrain['Rup_Var_ID'][i]))
-eventid_unique = list(set(eventid))
-
+'''
+set the sourceid and ruptureid parameters (from eventid_unique)
+reads in training and testing data and finds location paramters for events
+'''
+# choose event for plotting
 sourceid = 148
 ruptureid = 1
-#find all instances of events (on all stations and grab stations and predictions at each station)
-#source id 1-288, rupture id 1-1296, rup var 1-604
+
+# find all instances of events (on all stations and grab stations and predictions at each station)
 eventids = dftrain.loc[(dftrain['Source_ID'] == sourceid) & (dftrain['Rupture_ID']== ruptureid )]# & (dftrain['Rup_Var_ID']==55)]
 inds = eventids.index.values
-# read in csvs of ytrain and prediction
 
-#observed and predicted ground motions
+# observed and predicted ground motions
 dftrain_obspre = pd.read_csv(folder_pathmod + 'train_obs_pre.csv', index_col=0)
 dftest_obspre  = pd.read_csv(folder_pathmod + 'test_obs_pre.csv', index_col=0)
 
-#split into obs and predicted
+# split into obs and predicted
 colnames = dftrain_obspre.columns
 
 target_obs = dftrain_obspre[colnames[0:10]].iloc[inds]
 target_pre = dftrain_obspre[colnames[10:20]].iloc[inds]
 
-
-#%%
-#base models
-
-
-
-#%% 
-import keras
-#open trained model
-keras.models.load_model(folderpath_mod + "model")
-#%%
-
-
 n = 13
 train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = n)
-#add the location features
+
+# add the location features
 train_data1,test_data1, feature_names = add_locfeat(train_data1,test_data1, feature_names)
 train_data1,test_data1, feature_names = add_az(train_data1,test_data1, feature_names)
 
 data = train_data1
 
+# location parameters for plots
 sitelat = data[:,13]
 sitelon = data[:,14]
 evlat = data[:,15]
@@ -130,17 +130,14 @@ for i in range(len(period)):
     ax2.scatter(evlon,evlat,marker = '*', s=0.2, c = 'gray', label = 'event', alpha = 0.02)
     ax2.scatter(sitelon,sitelat,marker = '^',s=0.2, c = 'black', label = 'site', alpha = 0.02)
     ax2.scatter(sitelon_ev, sitelat_ev, s=50, c = colors_pre)    
-    
     plt.xlim(-120,-116.5)
     plt.ylim(33,35.5)
-    # plt.title(colname)
     plt.legend(loc = 'lower left')
     
     plt.subplots_adjust(right=0.9)
     cbar_ax = fig.add_axes([0.92, 0.15, 0.03, 0.7])
     cbar = plt.colorbar(s_m, orientation='vertical',cax=cbar_ax)
-    # cbar.set_label(colname[i] + ' counts', fontsize = 20)
-    plt.savefig(folder_pathmod + 'shakemap_' + str(period[i]) +'.png')
+    plt.savefig(folder_pathmod + 'map_' + str(period[i]) +'.png')
     plt.show()
 
     

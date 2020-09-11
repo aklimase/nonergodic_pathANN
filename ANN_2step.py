@@ -5,7 +5,6 @@ Created on Mon Jul 20 13:19:45 2020
 
 @author: aklimasewski
 
-
 build a model that takes cybershake data, input to 12 feature ANN,input those residuals to a spatial ANN
 
 use spatial kernel in second model

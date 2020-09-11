@@ -40,43 +40,43 @@ n = 13
 az = True
 
 #%%
-#read in data to grid if needed
-#create grid of polygons in a dataframe
+# read in data to grid if needed
+# create grid of polygons in a dataframe
 #lat, lon are midpoint list of each grid cell
 
-#includes all data except outside .2 percentile (tst and train)
-#27
-# df, lon, lat = create_grid_square(latmin=33,latmax=36.0,lonmin=-120.5,lonmax=-115.7,dx=.3,dy=0.25)
-#10km
-# df, lon, lat = create_grid_square(latmin=33,latmax=36.0,lonmin=-120.5,lonmax=-115.7,dx=.11,dy=0.09)
-#50km
-# df, lon, lat = create_grid_square(latmin=33,latmax=36.0,lonmin=-120.5,lonmax=-115.7,dx=.55,dy=0.45)
+# includes all data except outside .2 percentile (tst and train)
+# 27
+df, lon, lat = create_grid_square(latmin=33,latmax=36.0,lonmin=-120.5,lonmax=-115.7,dx=.3,dy=0.25)
+# 10km
+df, lon, lat = create_grid_square(latmin=33,latmax=36.0,lonmin=-120.5,lonmax=-115.7,dx=.11,dy=0.09)
+# 50km
+df, lon, lat = create_grid_square(latmin=33,latmax=36.0,lonmin=-120.5,lonmax=-115.7,dx=.55,dy=0.45)
 
-#read in training data and add 
-# train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = n)
-# train_data1,test_data1, feature_names = add_locfeat(train_data1,test_data1, feature_names)
-# train_data1,test_data1, feature_names = add_midpoint(train_data1,test_data1, feature_names)
+# read in training data and add 
+train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = n)
+train_data1,test_data1, feature_names = add_locfeat(train_data1,test_data1, feature_names)
+train_data1,test_data1, feature_names = add_midpoint(train_data1,test_data1, feature_names)
 
-# grid_points(train_data1,df,name='train',folder_path=folder_path)
-# grid_points(test_data1,df,name='test',folder_path=folder_path)
+grid_points(train_data1,df,name='train',folder_path=folder_path)
+grid_points(test_data1,df,name='test',folder_path=folder_path)
 
-#grid NGA data if needed 
-# filename = '/Users/aklimasewski/Documents/data/NGA_mag2_9.csv'
-# nga_data1, nga_targets1, feature_names = readindataNGA(filename,n)
-# nga_data1, feature_names = add_locfeatNGA(filename, nga_data1, feature_names)
-# nga_data1, feature_names = add_midpointNGA(filename, nga_data1,feature_names)
-# grid_points(nga_data1,df,name='nga',folder_path=folder_path)
+# grid NGA data if needed 
+filename = '/Users/aklimasewski/Documents/data/NGA_mag2_9.csv'
+nga_data1, nga_targets1, feature_names = readindataNGA(filename,n)
+nga_data1, feature_names = add_locfeatNGA(filename, nga_data1, feature_names)
+nga_data1, feature_names = add_midpointNGA(filename, nga_data1,feature_names)
+grid_points(nga_data1,df,name='nga',folder_path=folder_path)
 
 #%%
 # read in counts and plot
 
-# counts_train = pd.read_csv(folder_path + 'counts_train.csv',header = 0,index_col=0)
-# counts_test = pd.read_csv(folder_path + 'counts_test.csv',header = 0,index_col=0)
-# counts_nga = pd.read_csv(folder_path + 'counts_nga.csv',header = 0,index_col=0)
+counts_train = pd.read_csv(folder_path + 'counts_train.csv',header = 0,index_col=0)
+counts_test = pd.read_csv(folder_path + 'counts_test.csv',header = 0,index_col=0)
+counts_nga = pd.read_csv(folder_path + 'counts_nga.csv',header = 0,index_col=0)
 
-# plot_counts(np.asarray(counts_nga),data = nga_data1,name='nga',folder_path =folder_path)
-# plot_counts(np.asarray(counts_train),data = train_data1, name='train', folder_path =folder_path)
-# plot_counts(np.asarray(counts_test),data = test_data1,name='test',folder_path =folder_path)
+plot_counts(np.asarray(counts_nga),data = nga_data1,name='nga',folder_path =folder_path)
+plot_counts(np.asarray(counts_train),data = train_data1, name='train', folder_path =folder_path)
+plot_counts(np.asarray(counts_test),data = test_data1,name='test',folder_path =folder_path)
 
 #%%
 folder_pathmod = folder_path + 'n4_ANN13cells_20ep_1_20/'

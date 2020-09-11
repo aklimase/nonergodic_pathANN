@@ -6,9 +6,6 @@ Created on Thu Aug 27 13:41:36 2020
 @author: aklimasewski
 """
 
-
-#data histograms
-
 import sys
 import os
 sys.path.append(os.path.abspath('/Users/aklimasewski/Documents/python_code_nonergodic'))
@@ -37,10 +34,10 @@ if not os.path.exists(folder_path):
     os.makedirs(folder_path + 'NGAopenquake/')
     os.makedirs(folder_path + 'NGAresid/')
 
-    
 period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 
-#load in training and testing data
+# cybershake data
+# load in training and testing data
 n=13
 train_data1, test_data1, train_targets1, test_targets1, feature_names = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = n)
 
@@ -53,8 +50,9 @@ for i in range(len(period)):
     plt.savefig(folder_path + 'cybershake/T_' + str(period[i]) + '.png')
     plt.show()
 
+# NGA data
 filename = '/Users/aklimasewski/Documents/data/NGAWest2region_clean.csv'
-#load NGA data (targets in g?)
+# load NGA data
 nga_data1, nga_targets1, feature_names = readindataNGA(filename,n=n)
 
 for i in range(len(period)):
@@ -87,21 +85,16 @@ for i in range(len(period)):
     plt.xlim(0,xmax)
     plt.savefig(folder_path + 'NGA_SA/ms_T_' + str(period[i]) + '.png')
     plt.show()
-    
-#openquake predictions of NGA data in ln(g)
-# model_avg = gmpe_avg(nga_data1)
-# df_out = pd.DataFrame(model_avg, columns=['T10','T7.5','T5','T4','T3','T2','T1','T0.5','T0.2','T0.1'])   
-# df_out.to_csv('/Users/aklimasewski/Documents/data/NGAopenquake_predictions_lng.csv')  
 
+# NGA predictions
 model_avg = np.asarray(pd.read_csv('/Users/aklimasewski/Documents/data/NGAopenquake_predictions_lng.csv',index_col=0))
+
 for i in range(len(period)):
     plt.figure(figsize =(8,6))
     plt.hist(model_avg[:,i],bins=40)
     plt.title('NGA openquake predictions T= '+ str(period[i]) + ' s in ln g?')
     plt.xlabel('target values')
     plt.ylabel('counts')
-    # xmax = np.percentile(model_avg[:,i],98)
-    # plt.xlim(0,xmax)
     plt.savefig(folder_path + 'NGAopenquake/T_' + str(period[i]) + '.png')
     plt.show()
     
@@ -115,7 +108,7 @@ for i in range(len(period)):
     plt.savefig(folder_path + 'NGAopenquake/g_T_' + str(period[i]) + '.png')
     plt.show()
 
-
+#NGA residuals
 nga_resid = np.log(nga_targets1) - model_avg
 
 for i in range(len(period)):
@@ -124,13 +117,7 @@ for i in range(len(period)):
     plt.title('NGA GM residuals T= '+ str(period[i]) + ' s in ln g?')
     plt.xlabel('target values')
     plt.ylabel('counts')
-    # xmax = np.percentile(nga_resid[:,i],98)
-    # plt.xlim(0,xmax)
     plt.savefig(folder_path + 'NGAresid/T_' + str(period[i]) + '.png')
     plt.show()
-
-
-
-
 
 

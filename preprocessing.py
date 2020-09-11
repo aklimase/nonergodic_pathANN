@@ -5,35 +5,8 @@ Created on Mon Jul 20 14:57:47 2020
 
 @author: aklimasewski
 
-functions for preprocessings ANN data
+functions for preprocessings cybershake data for ANNs
 """
-
-# def transform_dip(diptrain,diptest,rxtrain,rxtest):
-#     '''
-#     transforms cybershake dips and Rx
-    
-#     Parameters
-#     ----------
-#     diptrain: numpy array of cybershake fault dips of training data
-#     diptest: numpy array of cybershake fault dips of testing data
-#     rxtrain: numpy array of rx train
-#     rxtest: numpy array of rx test
-    
-#     returns transformed inputs as numpy arrays
-#     '''
-#     for i in range(len(diptrain)):
-#         if diptrain[i]>30:
-#             rxtrain[i]=rxtrain[i]*(90-diptrain[i])/45
-#         else:
-#             rxtrain[i]=rxtrain[i]*60/45
-            
-#     for i in range(len(diptest)): 
-#         if diptest[i]>30:
-#             rxtest[i]=rxtest[i]*(90-diptest[i])/45
-#         else:
-#             rxtest[i]=rxtest[i]*60/45    
-#     #return the transformed arrays
-#     return diptrain, diptest, rxtrain, rxtest
 
 def transform_dip(dip,rx):
     '''
@@ -46,7 +19,9 @@ def transform_dip(dip,rx):
     rxtrain: numpy array of rx train
     rxtest: numpy array of rx test
     
-    returns transformed inputs as numpy arrays
+    Returns
+    -------
+    transformed inputs as numpy arrays
     '''
     for i in range(len(dip)):
         if (dip[i] > 30):
@@ -57,7 +32,7 @@ def transform_dip(dip,rx):
     #return the transformed arrays
     return dip, rx
 
-def readindata(nametrain, nametest, n):
+def readindata(nametrain, nametest, n=13):
     '''
     takes training and testing files and creates numpy arrays formatted for Kyle's code
     
@@ -67,7 +42,8 @@ def readindata(nametrain, nametest, n):
     nametest: path of the testing data file
     n: number of input variables, corresponds to specific model
     
-    returns
+    Returns
+    -------
     train_data1: numpy array of training features
     test_data1: numpy array of testing features
     train_targets1: numpy array of PSA of training data for 10 periods
@@ -84,8 +60,7 @@ def readindata(nametrain, nametest, n):
     print(dftrain.shape)
     print(dftest.shape)
     
-    
-    #separate dataframe to pandas series (1 col of df)
+    # separate dataframe to pandas series (1 col of df)
     Mwtrain= dftrain["Mag"]
     distrain=dftrain["Site_Rupture_Dist"]
     vs30train=np.array(dftrain["vs30"])
@@ -101,7 +76,7 @@ def readindata(nametrain, nametest, n):
     diptrain=dftrain["Dip_y"]
     striketrain=dftrain["Strike_y"]+180
     widthtrain=dftrain["Width"]
-    #Outputs (col per period)
+    # Outputs (col per period)
     residtesttemp=dftrain.loc[:, 'IM_Value':'IM175']
     train_targets1=residtesttemp.values
 
@@ -115,7 +90,7 @@ def readindata(nametrain, nametest, n):
     xitrain=dftrain["xi"]
     startdepthtrain=dftrain["Start_Depth"]
     
-    #same with testdata
+    # same with testdata
     Mwtest= dftest["Mag"]
     distest=dftest["Site_Rupture_Dist"]
     vs30test=np.array(dftest["vs30"])
@@ -158,7 +133,7 @@ def readindata(nametrain, nametest, n):
         test_data1 = np.column_stack([lattest, longtest, hypolattest, hypolontest])
         feature_names=np.asarray(['stlat', 'stlon', 'hypolat','hypolon'])
    
-    #defualt, cybershake ANN, n = 12
+    # defualt, cybershake ANN, n = 12
     elif n ==12: 
         train_data1 = np.column_stack([Mwtrain,distrain,vs30train,z10train,z25train,raketrain,diptrain,hypodepthtrain, widthtrain,
                                 rjbtrain,rxtrain,startdepthtrain])
@@ -182,6 +157,22 @@ def readindata(nametrain, nametest, n):
 
 
 def add_locfeat(train_data1,test_data1, feature_names):
+    '''
+    takes training and testing arrays and adds station and hypocenter latitude and longitude
+    
+    Parameters
+    ----------
+    train_data1: numpy array of training features
+    test_data1: numpy array of testing features
+    feature_names: numpy array feature names
+    
+    Returns
+    -------
+    train_data1: numpy array of training features
+    test_data1: numpy array of testing features
+    feature_names: numpy array feature names
+    
+    '''
     #calculats forward azimuth between event and station and adds to training and testing data
     import numpy as np
     
@@ -192,11 +183,24 @@ def add_locfeat(train_data1,test_data1, feature_names):
     
     return train_data1, test_data1, feature_names
 
-
-
-#add aziumth
 def add_az(train_data1,test_data1, feature_names):
-    #calculats forward azimuth between event and station and adds to training and testing data
+    '''
+    takes training and testing arrays and adds forward azimuth
+    
+    Parameters
+    ----------
+    train_data1: numpy array of training features
+    test_data1: numpy array of testing features
+    feature_names: numpy array feature names
+    
+    Returns
+    -------
+    train_data1: numpy array of training features
+    test_data1: numpy array of testing features
+    feature_names: numpy array feature names
+    
+    '''
+    # calculats forward azimuth between event and station and adds to training and testing data
     import pyproj
     import numpy as np
     
@@ -204,12 +208,12 @@ def add_az(train_data1,test_data1, feature_names):
     
     train_data1_4, test_data1_4, train_targets1_4, test_targets1_4, feature_names_4 = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = 4)
     
-    #station lat lon and event lat lon
+    # station lat lon and event lat lon
     az12,az21,distance = geodesic.inv(train_data1_4[:,3],train_data1_4[:,2],train_data1_4[:,1],train_data1_4[:,0])
     az12_test,az21_test,distance_test = geodesic.inv(test_data1_4[:,3],test_data1_4[:,2],test_data1_4[:,1],test_data1_4[:,0])
 
 
-    #add the path features
+    # add the path features
     train_data1 = np.concatenate([train_data1,az12.reshape(len(az12),1)], axis = 1)
     test_data1 = np.concatenate([test_data1,az12_test.reshape(len(az12_test),1)], axis = 1)
     feature_names = np.concatenate([feature_names,np.asarray(['forward_az'])], axis = 0)
@@ -217,16 +221,32 @@ def add_az(train_data1,test_data1, feature_names):
     return train_data1, test_data1, feature_names
 
 def add_midpoint(train_data1,test_data1, feature_names):
-    #calculated midpoint lat, lon between event and station and adds to training and testing data
+    '''
+    takes training and testing arrays and adds forward azimuth
+    
+    Parameters
+    ----------
+    train_data1: numpy array of training features
+    test_data1: numpy array of testing features
+    feature_names: numpy array feature names
+    
+    Returns
+    -------
+    train_data1: numpy array of training features
+    test_data1: numpy array of testing features
+    feature_names: numpy array feature names
+    
+    '''
+    # calculated midpoint lat, lon between event and station and adds to training and testing data
     import numpy as np
     
     train_data1_4, test_data1_4, train_targets1_4, test_targets1_4, feature_names_4 = readindata(nametrain='/Users/aklimasewski/Documents/data/cybertrainyeti10_residfeb.csv', nametest='/Users/aklimasewski/Documents/data/cybertestyeti10_residfeb.csv', n = 4)
     
-    #station lat lon and event lat lon
+    # station lat lon and event lat lon
     midpoint = np.asarray([(train_data1_4[:,0]+train_data1_4[:,2])/2.,(train_data1_4[:,1]+train_data1_4[:,3])/2.]).T
     midpoint_test = np.asarray([(test_data1_4[:,0]+test_data1_4[:,2])/2.,(test_data1_4[:,1]+test_data1_4[:,3])/2.]).T
 
-    #add the path features
+    # add the path features
     train_data1 = np.concatenate([train_data1,midpoint], axis = 1)
     test_data1 = np.concatenate([test_data1,midpoint_test], axis = 1)
     feature_names = np.concatenate([feature_names,np.asarray(['midpointlat','midpointlon'])], axis = 0)
@@ -237,6 +257,7 @@ def add_midpoint(train_data1,test_data1, feature_names):
 def transform_data(transform_method, train_data1, test_data1, train_targets1, test_targets1, feature_names, folder_path):
     '''
     uses a sklearn transformation function to transform data for the ANN and creates hisogram of transformed variables
+    transform_method = 'Norm' is custom normalization functions
     
     Parameters
     ----------
@@ -249,14 +270,14 @@ def transform_data(transform_method, train_data1, test_data1, train_targets1, te
     folder_path: path to save histogram as .pngs
     
     Returns
+    -------
     x_train: numpy array of transformed training data
-    y_train: numpy array of training targets (not transformed)
+    y_train: numpy array of training targets
     x_test: numpy array of transformed testing data 
-    y_test: numpy array of testing targets (not transformed)
+    y_test: numpy array of testing targets
     x_range: 2D list of min, max for all transformed training features
     x_train_raw: numpy array of untransformed train data
     x_test_raw: numpy array of untransformed test data
-    
     '''
     import numpy as np
     import matplotlib.pyplot as plt
@@ -274,7 +295,7 @@ def transform_data(transform_method, train_data1, test_data1, train_targets1, te
         train_data=aa.transform(train_data1)
         test_data=aa.transform(test_data1)
     
-    #plot transformed features
+    # plot transformed features
     for i in range(len(train_data[0])):
         plt.figure(figsize =(8,8))
         plt.title('transformed feature: ' + str(feature_names[i]))
@@ -297,120 +318,5 @@ def transform_data(transform_method, train_data1, test_data1, train_targets1, te
     x_range = [[min(train_data.T[i]) for i in range(len(train_data[0]))],[max(train_data.T[i]) for i in range(len(train_data[0]))]]
 
     return(x_train, y_train, x_test, y_test, x_range, x_train_raw,  x_test_raw)
-
-
-# def create_grid(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.05):
-#     '''
-#     Parameters
-#     ----------
-#     latmin: float minimum value of grid latitude, default 32 N
-#     latmax: float maximum value of grid latitude, default 37.5 N
-#     lonmin: float minimum value of grid longitude, default -121 W
-#     lonmax: float maximum value of grid longitude, default -115.5 W
-#     dx: float grid spacing in degrees default is 0.05.
-
-#     Returns
-#     df: pandas dataframe of shapely polgons and midpoint of each grid cell in lat, lon
-#     lon: 1D numpy array of longitude grid vertices
-#     lat: 1D numpy array of latitude grid vertices
-#     '''
-
-#     import numpy as np
-#     import shapely
-#     import shapely.geometry
-#     import pandas as pd
-    
-#     # dx=0.1
-#     lon = np.arange(-121,-115.5, dx)
-#     lat = np.arange(32, 37.5, dx)
-    
-#     latmid = []
-#     lonmid = []
-#     polygons = []
-#     for i in range(len(lon)-1):
-#         for j in range(len(lat)-1):
-#             polygon_points = [(lon[i], lat[j]), (lon[i], lat[j+1]), (lon[i+1], lat[j+1]), (lon[i+1], lat[j]), (lon[i], lat[j])]
-#             shapely_poly = shapely.geometry.Polygon(polygon_points)
-#             polygons.append(shapely_poly)
-#             latmid.append((lat[j]+lat[j+1])/2.)
-#             lonmid.append((lon[i]+lon[i+1])/2.)
-               
-#     d = {'polygon': polygons, 'latmid': latmid, 'lonmid': lonmid}
-#     df = pd.DataFrame(data=d)    
-#     return df, lon, lat
-    
-# def grid_data(train_data1, train_targets1, df):
-#     '''
-#     Parameters
-#     ----------
-#     train_data1: numpy array of training data for gridding
-#     train_targets1: numpy array of testing targets for gridding
-#     df: pandas dataframe of shapely polgons and midpoint of each grid cell in lat, lon
-#     nsamples: number of samples to randomly choose (for fast testing)
-    
-#     Returns
-#     hypoR: numpy array of hypocentral distance for sample
-#     sitelat: numpy array of site latitude for sample
-#     sitelon: numpy array of site longitude for sample
-#     evlat: numpy array of event latitude for sample
-#     evlon: numpy array of event longitude for sample
-#     target: numpy array of targets for sample
-#     gridded_targetsnorm_list: 2D list of targets normalized by path length and multiplied by distance per cell
-#     gridded_counts: 2D list of path counts per grid cell
-#     '''
-#     import shapely
-#     import shapely.geometry
-#     import numpy as np
-#     import geopy
-#     import random
-#     import geopy.distance
-
-    
-#     # randindex = random.sample(range(0, len(train_data1)), nsamples)
-    
-#     # hypoR = train_data1[:,0][randindex]
-#     # sitelat = train_data1[:,1][randindex]
-#     # sitelon = train_data1[:,2][randindex]
-#     # evlat = train_data1[:,3][randindex]
-#     # evlon = train_data1[:,4][randindex]
-#     # target = train_targets1[:][randindex]
-    
-    
-#     hypoR = train_data1[:,0]
-#     sitelat = train_data1[:,1]
-#     sitelon = train_data1[:,2]
-#     evlat = train_data1[:,3]
-#     evlon = train_data1[:,4]
-#     target = train_targets1[:]
-    
-#     normtarget = target / hypoR[:, np.newaxis]
-#     gridded_targetsnorm_list = [ [] for _ in range(df.shape[0]) ]
-    
-#     gridded_counts = np.zeros(df.shape[0])
-#     lenlist = []
-    
-#     #loop through each record     
-#     for i in range(len(sitelat)):                       
-#         line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
-#         path=shapely.geometry.LineString(line)
-#         #loop through each grid cell
-#         if (i % 1000) == 0:
-#         	print('record: ', str(i))
-#         for j in range(len(df)):
-#             shapely_poly = df['polygon'][j]
-#             if path.intersects(shapely_poly) == True:
-#                 shapely_line = shapely.geometry.LineString(line)
-#                 intersection_line = list(shapely_poly.intersection(shapely_line).coords)
-#                 if len(intersection_line)== 2:
-#                     coords_1 = (intersection_line[0][1], intersection_line[0][0])
-#                     coords_2 = (intersection_line[1][1], intersection_line[1][0])
-#                     length=geopy.distance.distance(coords_1, coords_2).km
-#                     gridded_targetsnorm_list[j].append(normtarget[i]*length)          
-#                     gridded_counts[j] += 1
-#                     lenlist.append(length)
-                
-#     return hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts
-    
-
 
 

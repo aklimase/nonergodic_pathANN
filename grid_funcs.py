@@ -10,6 +10,8 @@ contains gridding functions
 
 def create_grid(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.05):
     '''
+    creates a dataframe with grid polygon objects and grid midpoint latitude and longitude
+    
     Parameters
     ----------
     latmin: float minimum value of grid latitude, default 32 N
@@ -29,7 +31,6 @@ def create_grid(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.05):
     import shapely.geometry
     import pandas as pd
     import geopy.distance
-
     
     # dx=0.1
     lon = np.arange(lonmin, lonmax+dx, dx)
@@ -58,7 +59,8 @@ def create_grid_square(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.24, 
     latmax: float maximum value of grid latitude, default 37.5 N
     lonmin: float minimum value of grid longitude, default -121 W
     lonmax: float maximum value of grid longitude, default -115.5 W
-    dx: float grid spacing in degrees default is 0.05.
+    dx: float grid spacing in degrees default is 0.24.
+    dy: float grid spacing in degrees default is 0.2.
 
     Returns
     df: pandas dataframe of shapely polgons and midpoint of each grid cell in lat, lon
@@ -73,7 +75,6 @@ def create_grid_square(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.24, 
     import geopy
     import geopy.distance
     
-    # dx=0.1
     lon = np.arange(lonmin, lonmax+dx, dx)
     lat = np.arange(latmin, latmax+dy, dy)
     
@@ -107,6 +108,9 @@ def create_grid_square(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.24, 
     
 def grid_data(train_data1, train_targets1, df):
     '''
+    list of normalized target values per cell (normalized target = target/path length)
+    returns grid parameters as lists
+    
     Parameters
     ----------
     train_data1: numpy array of training data for gridding
@@ -115,6 +119,7 @@ def grid_data(train_data1, train_targets1, df):
     nsamples: number of samples to randomly choose (for fast testing)
     
     Returns
+    -------
     hypoR: numpy array of hypocentral distance for sample
     sitelat: numpy array of site latitude for sample
     sitelon: numpy array of site longitude for sample
@@ -122,25 +127,13 @@ def grid_data(train_data1, train_targets1, df):
     evlon: numpy array of event longitude for sample
     target: numpy array of targets for sample
     gridded_targetsnorm_list: 2D list of targets normalized by path length and multiplied by distance per cell
-    gridded_counts: 2D list of path counts per grid cell
+    gridded_counts: list of path counts per grid cell
     '''
     import shapely
     import shapely.geometry
     import numpy as np
     import geopy
-    import random
     import geopy.distance
-
-    
-    # randindex = random.sample(range(0, len(train_data1)), nsamples)
-    
-    # hypoR = train_data1[:,0][randindex]
-    # sitelat = train_data1[:,1][randindex]
-    # sitelon = train_data1[:,2][randindex]
-    # evlat = train_data1[:,3][randindex]
-    # evlon = train_data1[:,4][randindex]
-    # target = train_targets1[:][randindex]
-    
     
     hypoR = train_data1[:,0]
     sitelat = train_data1[:,1]
@@ -155,11 +148,11 @@ def grid_data(train_data1, train_targets1, df):
     gridded_counts = np.zeros(df.shape[0])
     lenlist = []
     
-    #loop through each record     
+    # loop through each record     
     for i in range(len(sitelat)):                       
         line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
         path=shapely.geometry.LineString(line)
-        #loop through each grid cell
+        # loop through each grid cell
         if (i % 1000) == 0:
         	print('record: ', str(i))
         for j in range(len(df)):
@@ -177,62 +170,28 @@ def grid_data(train_data1, train_targets1, df):
                 
     return hypoR, sitelat, sitelon, evlat, evlon, target, gridded_targetsnorm_list, gridded_counts
     
-
-
-
-
-# def mean_grid_save(gridded_targetsnorm_list,gridded_counts,gridded_counts_test, df,folder_path,name):
-#     import numpy as np
-#     import pandas as pd
-    
-#     period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
-
-    
-#     #find mean of norm residual
-#     gridded_targetsnorm_list = np.asarray(gridded_targetsnorm_list)
-    
-#     griddednorm_mean=np.zeros((len(gridded_targetsnorm_list),10))
-#     for i in range(len(gridded_targetsnorm_list)):
-#         griddednorm_mean[i] = np.mean(gridded_targetsnorm_list[i],axis=0)
-    
-#     nan_ind=np.argwhere(np.isnan(griddednorm_mean)).flatten()
-#     for i in nan_ind:
-#         griddednorm_mean[i] = 0
-        
-#     gridded_targetsnorm_list_test = np.asarray(gridded_targetsnorm_list_test)
-    
-#     griddednorm_mean_test=np.zeros((len(gridded_targetsnorm_list_test),10))
-#     for i in range(len(gridded_targetsnorm_list_test)):
-#         griddednorm_mean_test[i] = np.mean(gridded_targetsnorm_list_test[i],axis=0)
-    
-#     #find the cells with no paths (nans)
-#     nan_ind=np.argwhere(np.isnan(griddednorm_mean_test)).flatten()
-#     for i in nan_ind:
-#         griddednorm_mean_test[i] = 0
-        
-#     df_save = df
-#     meandict = {'T' + str(period[i]): griddednorm_mean[:,i] for i in range(len(period))}
-#     meandict_test = {'T' + str(period[i]) + 'test': griddednorm_mean_test[:,i] for i in range(len(period))}
-#     d2 = {'griddedcounts': gridded_counts, 'griddedcountstest': gridded_counts_test}
-#     d2.update(meandict)
-#     d2.update(meandict_test)
-#     df2 = pd.DataFrame(data=d2)   
-#     # df_save.append(df2)
-#     df_save=pd.concat([df_save,df2],axis=1)
-#     df_save.to_csv(folder_path + 'griddedvalues.csv')
-    
-#     return griddednorm_mean, griddednorm_mean_test
-
-
-
 def mean_grid_save(gridded_targetsnorm_list,gridded_counts,df,folder_path,name):
+    '''
+    saves gridded counts and gridded normalized target mean to a csv
+    
+    Parameters
+    ----------
+    gridded_targetsnorm_list: 2D list of targets normalized by path length and multiplied by distance per cell
+    gridded_counts: list of path counts per grid cell
+    df: pandas dataframe of shapely polgons and midpoint of each grid cell in lat, lon
+    folder_path: path for saving csv files
+    name: string for name of csv file (ie training or testing)
+
+    Returns
+    -------
+    griddednorm_mean: array of average normalized target per cell
+    '''
     import numpy as np
     import pandas as pd
     
     period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
-
     
-    #find mean of norm residual
+    # find mean of norm residual
     gridded_targetsnorm_list = np.asarray(gridded_targetsnorm_list)
     
     griddednorm_mean=np.zeros((len(gridded_targetsnorm_list),10))
@@ -243,27 +202,35 @@ def mean_grid_save(gridded_targetsnorm_list,gridded_counts,df,folder_path,name):
     for i in nan_ind:
         griddednorm_mean[i] = 0
         
-        
     df_save = df
     meandict = {'T' + str(period[i]): griddednorm_mean[:,i] for i in range(len(period))}
-    # meandict_test = {'T' + str(period[i]) + 'test': griddednorm_mean_test[:,i] for i in range(len(period))}
     d2 = {'griddedcounts': gridded_counts}
     d2.update(meandict)
-    # d2.update(meandict_test)
     df2 = pd.DataFrame(data=d2)   
-    # df_save.append(df2)
     df_save=pd.concat([df_save,df2],axis=1)
     df_save.to_csv(folder_path + 'griddedvalues_' + name +'.csv')
     
     return griddednorm_mean
 
 def save_gridded_targets(griddednorm_mean,griddednorm_mean_test,gridded_counts,gridded_counts_test,df, folder_path):
-    import pandas as pd
+    '''
+    Parameters
+    ----------
+    griddednorm_mean: array of average normalized target per cell for training data
+    griddednorm_mean_test: array of average normalized target per cell for testing data
+    gridded_counts: list of path counts per grid cell for training data
+    gridded_counts_test: list of path counts per grid cell for testing data
+    df: pandas dataframe of shapely polgons and midpoint of each grid cell in lat, lon
+    folder_path: path for saving csv files
+
+    Returns
+    -------
+    saves gridded value csv file
+    '''
     import pandas as pd
     
     period=[10,7.5,5,4,3,2,1,0.5,0.2,0.1]
 
-    
     df_save = df
     meandict = {'T' + str(period[i]): griddednorm_mean[:,i] for i in range(len(period))}
     meandict_test = {'T' + str(period[i]) + 'test': griddednorm_mean_test[:,i] for i in range(len(period))}
@@ -271,12 +238,24 @@ def save_gridded_targets(griddednorm_mean,griddednorm_mean_test,gridded_counts,g
     d2.update(meandict)
     d2.update(meandict_test)
     df2 = pd.DataFrame(data=d2)   
-    # df_save.append(df2)
     df_save=pd.concat([df_save,df2],axis=1)
     df_save.to_csv(folder_path + 'griddedvalues.csv')
     
-    
 def grid_points(data,df,name, folder_path):
+    '''
+    for each record saves grid numbers and midpoint locations for event, midpoint, and station cells to csvs
+    
+    Parameters
+    ----------
+    data: numpy array of data
+    df: pandas dataframe of shapely polgons and midpoint of each grid cell in lat, lon
+    name: string for name of csv file (ie training or testing)
+    folder_path: path for saving csv files
+
+    Returns
+    -------
+    saves 3 gridded value csv file
+    '''
     import pandas as pd
     import shapely
     import shapely.geometry
@@ -294,17 +273,15 @@ def grid_points(data,df,name, folder_path):
     
     gridded_num = np.zeros((len(sitelat),3))#event, mid, site'
     gridded_mid = np.zeros((len(sitelat),6))#event, mid, site'
-    
     gridded_counts = np.zeros((df.shape[0],3))
     
-    
-    #loop through each record     
+    # loop through each record     
     for i in range(len(sitelat)):    
         event = shapely.geometry.Point(evlon[i], evlat[i])
         mid = shapely.geometry.Point(midlon[i], midlat[i])
         site = shapely.geometry.Point(sitelon[i], sitelat[i])
-        #loop through each grid cell
-        #add a 1 for the column if event, mid, site in the cell
+        # loop through each grid cell
+        # add a 1 for the column if event, mid, site in the cell
         if (i % 1000) == 0:
         	print('record: ', str(i))
         for j in range(len(df)):
@@ -333,6 +310,22 @@ def grid_points(data,df,name, folder_path):
     
     
 def avgpath_resid(df, folder_path,savename):
+    '''
+    loops through each record and multiplies average normalized target per cell by path length in each cell
+    
+    Parameters
+    ----------
+    df: pandas dataframe of shapely polgons and midpoint of each grid cell in lat, lon
+    folder_path: path for saving csv files
+    savename: string for name of csv file (ie training or testing)
+
+    Returns
+    -------
+    path_target_sum: list of sum of path length per cell * average normalized target per cell
+        
+    saves path target sum per record in a csv
+    '''
+    
     import shapely
     import shapely.geometry
     from preprocessing import readindata
@@ -361,21 +354,18 @@ def avgpath_resid(df, folder_path,savename):
     evlat = train_data1[:,3]
     evlon = train_data1[:,4]
     target = train_targets1[:]
-
     
     path_target_sum = np.zeros((len(hypoR),10))#length of number of records
 
-    #loop through each record     
+    # loop through each record     
     for i in range(len(sitelat)):                       
         line = [(evlon[i], evlat[i]), (sitelon[i], sitelat[i])]
         path=shapely.geometry.LineString(line)
-        #loop through each grid cell
+        # loop through each grid cell
         if (i % 1000) == 0:
             print('record: ', str(i))
         pathsum = 0
         for j in range(len(list_polygons)):
-            # shapely_poly = df['polygon'][j].split('(')[2].split(')')[0]
-            # polygon_points = [(lon[i], lat[j]), (lon[i], lat[j+1]), (lon[i+1], lat[j+1]), (lon[i+1], lat[j]), (lon[i], lat[j])]
             shapely_poly = shapely.geometry.Polygon(list_polygons[j])
             if path.intersects(shapely_poly) == True:
                 shapely_line = shapely.geometry.LineString(line)
@@ -384,20 +374,29 @@ def avgpath_resid(df, folder_path,savename):
                     coords_1 = (intersection_line[0][1], intersection_line[0][0])
                     coords_2 = (intersection_line[1][1], intersection_line[1][0])
                     length=geopy.distance.distance(coords_1, coords_2).km
-                    
                     pathsum += length*np.asarray(targets.iloc[j])
             
         path_target_sum[i] = (pathsum)          
                     
-    # dictout = {['T10','T7.5','T5','T4','T3','T2','T1','T0.5','T0.2','T0.1']:path_target_sum}
     df_out = pd.DataFrame(path_target_sum, columns=['T10','T7.5','T5','T4','T3','T2','T1','T0.5','T0.2','T0.1'])   
-    # df_save.append(df2)
     df_out.to_csv(folder_path + 'avgrecord_targets_' + savename+ '.csv')     
 
     return path_target_sum       
 
- 
-def plot_counts(gridded_counts,data, name, folder_path):
+def plot_counts(gridded_counts, data,  lat, lon, name, folder_path):#add dataframe
+    '''
+    Parameters
+    ----------
+    gridded_counts: list of path counts per grid cell for training data
+    data: numpy array of data
+    name: string for name of png file (ie training or testing)
+    folder_path: path for saving png files
+
+    Returns
+    -------
+    creates pngs of gridded counts per target period
+    '''
+    
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     import numpy as np
@@ -440,18 +439,22 @@ def plot_counts(gridded_counts,data, name, folder_path):
         
 def gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evlat, sitelon, sitelat, folder_path):
     '''
+    plots average normalized residuals for each cell and counts of paths per cell
+    
     Parameters
     ----------
-    griddednorm_mean: 2D list of gridded normalized residuals
-    gridded_counts: 2D list of path counts per cell
-    period:
+    griddednorm_mean: list of gridded normalized residuals
+    gridded_counts: list of path counts per cell
+    period: list of target periods
     lat: list of grid cell latitudes
     lon: list of gtrid cell longitudes
-    evlon: 
-    evlat
-    sitelon
-    sitelat
-    folder_path
+    evlon: list of event locations
+    evlat: 
+    sitelon: 
+    sitelat: 
+    folder_path: path for saving png files
+    
+    creates pngs of gridded counts per target period and normalzied grid cell residual
     '''
     import numpy as np
     import matplotlib as mpl
@@ -473,8 +476,8 @@ def gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evl
             
         fig, ax = plt.subplots(figsize = (10,8))
         plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
-        plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
-        plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
+        plt.scatter(evlon,evlat,marker = '*', s=0.2, c = 'gray', label = 'event', alpha = 0.02)
+        plt.scatter(sitelon,sitelat,marker = '^',s=0.2, c = 'black', label = 'site', alpha = 0.02)
         plt.xlim(min(lon),max(lon))
         plt.ylim(min(lat),max(lat))
         plt.title('T ' + str(T) + ' s')
@@ -498,8 +501,8 @@ def gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evl
     
     fig, ax = plt.subplots(figsize = (10,8))
     plt.pcolormesh(lon, lat, Z, cmap = cmap, norm = normalize) 
-    plt.scatter(evlon,evlat,marker = '*', s=1, c = 'gray', label = 'event')
-    plt.scatter(sitelon,sitelat,marker = '^',s=1, c = 'black', label = 'site')
+    plt.scatter(evlon,evlat,marker = '*', s=0.2, c = 'gray', label = 'event', alpha = 0.02)
+    plt.scatter(sitelon,sitelat,marker = '^',s=0.2, c = 'black', label = 'site', alpha = 0.02)
     plt.xlim(min(lon),max(lon))
     plt.ylim(min(lat),max(lat))
     plt.title('T ' + str(T) + ' s')

@@ -33,9 +33,7 @@ from keras.models import Sequential
 import os
 import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
-# import tensorflow as tf
 import tensorflow_probability as tfp
-
 # For numeric stability, set the default floating-point dtype to float64
 tf.keras.backend.set_floatx('float64')
 
@@ -43,7 +41,6 @@ sns.reset_defaults()
 sns.set_style('whitegrid')
 sns.set_context('talk')
 sns.set_context(context='talk',font_scale=0.7)
-
 
 
 #%%
