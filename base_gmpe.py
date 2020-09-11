@@ -4,6 +4,8 @@
 Created on Tue Aug 25 11:38:19 2020
 
 @author: aklimasewski
+
+openquake base gmpes
 """
 
 filename = '/Users/aklimasewski/Documents/data/NGAWest2region.csv'

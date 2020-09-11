@@ -4,6 +4,9 @@
 Created on Thu Sep 10 17:21:36 2020
 
 @author: aklimasewski
+
+load in trained model, predict with NGA dataset (or other dataset), plot model residuals
+
 """
 import sys
 import os

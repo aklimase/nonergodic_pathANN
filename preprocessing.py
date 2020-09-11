@@ -14,10 +14,8 @@ def transform_dip(dip,rx):
     
     Parameters
     ----------
-    diptrain: numpy array of cybershake fault dips of training data
-    diptest: numpy array of cybershake fault dips of testing data
-    rxtrain: numpy array of rx train
-    rxtest: numpy array of rx test
+    dip: numpy array of cybershake fault dips
+    rx: numpy array of rx
     
     Returns
     -------

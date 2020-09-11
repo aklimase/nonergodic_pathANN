@@ -4,6 +4,8 @@
 Created on Tue Aug 25 14:23:21 2020
 
 @author: aklimasewski
+
+read in NGA data and calculate 4 base gmpe average
 """
 import numpy as np
 import pandas as pd
@@ -14,12 +16,12 @@ import os
 sys.path.append(os.path.abspath('/Users/aklimasewski/Documents/python_code_nonergodic'))
 from preprocessing import transform_dip
 
-def saveNGAtargets(filename):
+def saveNGAtargets(filename = '/Users/aklimasewski/Documents/data/Updated_NGA_West2_Flatfile_RotD50_d050_public_version.csv'):
     '''
     
     Parameters
     ----------
-    filename:
+    filename: name of NGA file
 
     Returns
     saves filtered data in csv
@@ -27,7 +29,7 @@ def saveNGAtargets(filename):
     
     from base_gmpe import gmpe_avg
     
-    filename = '/Users/aklimasewski/Documents/data/Updated_NGA_West2_Flatfile_RotD50_d050_public_version.csv'
+    # filename = '/Users/aklimasewski/Documents/data/Updated_NGA_West2_Flatfile_RotD50_d050_public_version.csv'
     dfnga = pd.read_csv(filename,index_col=0)
     
     periodnames = ['T10.000S','T7.500S','T5.000S','T4.000S','T3.000S','T2.000S','T1.000S','T0.200S','T0.500S','T0.100S']
@@ -180,13 +182,13 @@ def readindataNGA(filename,n=13):
     
     Parameters
     ----------
-    filename:
-    n:
+    filename: name of NGA file
+    n: number of model parameters
 
     Returns
-    nga_data1:
-    nga_targets1:
-    feature_names:
+    nga_data1:  numpy array of nga features
+    nga_targets1: numpy array of nga targets
+    feature_names: list of feature names
     '''
     
     import sys
@@ -271,16 +273,17 @@ def readindataNGA(filename,n=13):
 def add_locfeatNGA(filename, train_data1,feature_names):
     
     '''
+    add station and hypocenter lat, lon
     
     Parameters
     ----------
-    filename:
-    train_data1:
-    feature_names:
+    filename: name of NGA file
+    n: number of model parameters
 
     Returns
-    train_data1:
-    feature_names:
+    nga_data1:  numpy array of nga features
+    nga_targets1: numpy array of nga targets
+    feature_names: list of feature names
     '''
     import numpy as np
     import pandas as pd
@@ -303,16 +306,17 @@ def add_locfeatNGA(filename, train_data1,feature_names):
 
 def add_azNGA(filename, train_data1,feature_names):
     '''
+    add forward aziumth as feature
     
     Parameters
     ----------
-    filename:
-    train_data1:
-    feature_names:
+    filename: name of NGA file
+    n: number of model parameters
 
     Returns
-    train_data1:
-    feature_names:
+    nga_data1:  numpy array of nga features
+    nga_targets1: numpy array of nga targets
+    feature_names: list of feature names
     '''
     #calculats forward azimuth between event and station and adds to training and testing data
     import pyproj
@@ -344,16 +348,17 @@ def add_azNGA(filename, train_data1,feature_names):
 
 def add_midpointNGA(filename, train_data1, feature_names):
     '''
+    add path midpoin lat, lon as feature
     
     Parameters
     ----------
-    filename:
-    train_data1:
-    feature_names:
+    filename: name of NGA file
+    n: number of model parameters
 
     Returns
-    train_data1:
-    feature_names:
+    nga_data1:  numpy array of nga features
+    nga_targets1: numpy array of nga targets
+    feature_names: list of feature names
     '''
     
     #calculated midpoint lat, lon between event and station and adds to training and testing data

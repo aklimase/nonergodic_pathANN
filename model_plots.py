@@ -4,6 +4,8 @@
 Created on Wed Jul 29 08:51:16 2020
 
 @author: aklimase
+
+functions for plotting model outputs
 """
 
 import seaborn as sns
@@ -163,7 +165,7 @@ def plot_rawinputs(x_raw, mean_x_allT, y, feature_names, period, folder_path):
 
 def plot_outputs(folder_path, mean_x_test_allT, predict_epistemic_allT, mean_x_train_allT, predict_epistemic_train_allT, x_train, y_train, x_test, y_test, Rindex, period, feature_names):
     '''
-    transforms cybershake dips and Rx
+    makes figure of model predictions and observations
     
     Parameters
     ----------

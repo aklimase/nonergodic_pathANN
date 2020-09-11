@@ -51,8 +51,8 @@ def mergeNGAdata_cells(nametrain='/Users/aklimasewski/Documents/data/cybertrainy
     -------
     train_data1: numpy array of training features
     test_data1: numpy array of testing features
-    train_targets1: numpy array of training features
-    test_targets1: numpy array of testing features
+    train_targets1: numpy array of training targets
+    test_targets1: numpy array of testing targets
     feature_names: numpy array feature names
     '''
     

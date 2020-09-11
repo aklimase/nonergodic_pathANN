@@ -53,6 +53,8 @@ def create_grid(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.05):
 
 def create_grid_square(latmin=32,latmax=37.5,lonmin=-121,lonmax=-115.5,dx=0.24, dy=0.2):
     '''
+    data frame with varying dx and dy
+    
     Parameters
     ----------
     latmin: float minimum value of grid latitude, default 32 N
@@ -448,10 +450,10 @@ def gridded_plots(griddednorm_mean, gridded_counts, period, lat, lon, evlon, evl
     period: list of target periods
     lat: list of grid cell latitudes
     lon: list of gtrid cell longitudes
-    evlon: list of event locations
-    evlat: 
-    sitelon: 
-    sitelat: 
+    evlon: list of event longitudes
+    evlat:  list of event latitudes
+    sitelon:  list of site longitudes
+    sitelat:  list of site latitudes
     folder_path: path for saving png files
     
     creates pngs of gridded counts per target period and normalzied grid cell residual
